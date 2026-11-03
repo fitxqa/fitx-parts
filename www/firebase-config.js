@@ -12,4 +12,4 @@ window.FIREBASE_CONFIG = {
 
 // Google Drive backup (website only). Google Cloud console > APIs & Services > Credentials >
 // OAuth client ID (type: Web application). Paste the Client ID here.
-window.GOOGLE_CLIENT_ID = "PASTE_CLIENT_ID.apps.googleusercontent.com";
+window.GOOGLE_CLIENT_ID = "455163319161-0vkb7c24thqhql09iefa9ko42e7mqtpa.apps.googleusercontent.com";
