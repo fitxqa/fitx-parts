@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
 <link rel="icon" href="icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="FitX Parts">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>FitX Parts Bin</title>
 <link rel="preload" href="fonts/ibm-plex-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
 <style>
@@ -152,7 +158,7 @@ h3{font:700 .95rem var(--display);letter-spacing:.04em;text-transform:uppercase;
   <div class="wrap">
     <div class="brand">
       <div class="logo" aria-label="FitX Sports Equipment Services"><span class="mark" aria-hidden="true">Fit<b>X</b></span><div class="logo-sub"><small>Sports Equipment Services</small><h1>Parts Bin Stock</h1></div></div>
-      <div class="hdr-actions"><span class="sync" id="sync">Connecting…</span><button class="linkbtn" id="backupOpen">Backup</button><button class="linkbtn" id="signOut" hidden>Sign out</button></div>
+      <div class="hdr-actions"><span class="sync" id="sync">Connecting…</span><button class="linkbtn" id="installBtn" hidden>Install app</button><button class="linkbtn" id="backupOpen">Backup</button><button class="linkbtn" id="signOut" hidden>Sign out</button></div>
     </div>
     <div class="stats">
       <div class="stat"><b id="sTotal">0</b> parts in catalog</div>
@@ -271,6 +277,13 @@ LED 5mm red, 2
   </div>
 </div>
 </div><!-- /app -->
+<div class="sheet-bg" id="insBg" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="insTitle">
+    <h2 id="insTitle">Install FitX Parts</h2>
+    <div class="note" id="insText"></div>
+    <div class="actions"><button class="btn primary" id="insClose">OK</button></div>
+  </div>
+</div>
 <div class="toast" id="toast" hidden></div>
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
@@ -863,6 +876,32 @@ function armRelock(){ clearTimeout(relockT); relockT=setTimeout(()=>{ if(!qtyLoc
 $("lockBtn").onclick=()=>{ setLocked(!qtyLocked); if(!qtyLocked) toast("+ and − unlocked. They lock again after 1 minute without changes.") };
 document.addEventListener("visibilitychange",()=>{ if(document.hidden&&!qtyLocked) setLocked(true) });
 setLocked(true);
+
+// ---------- Install as app (website) ----------
+(function(){
+  if(isApp) return;
+  const standalone=window.matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
+  if("serviceWorker" in navigator && location.protocol==="https:"){ navigator.serviceWorker.register("sw.js").catch(()=>{}) }
+  if(standalone) return;
+  const ua=navigator.userAgent, ios=/iPhone|iPad|iPod/.test(ua)||(/Macintosh/.test(ua)&&"ontouchend" in document);
+  let deferred=null; const btn=$("installBtn");
+  window.addEventListener("beforeinstallprompt",e=>{ e.preventDefault(); deferred=e; btn.hidden=false });
+  window.addEventListener("appinstalled",()=>{ btn.hidden=true; deferred=null; toast("FitX Parts installed. Open it from your home screen or apps.") });
+  function howTo(){
+    if(ios) return 'On iPhone or iPad, open this page in <b>Safari</b>, tap the <b>Share</b> button (square with arrow), then <b>Add to Home Screen</b> and <b>Add</b>.';
+    if(/Android/.test(ua)) return 'In <b>Chrome</b>, tap the <b>⋮</b> menu, then <b>Install app</b> or <b>Add to Home screen</b>.';
+    return 'In <b>Chrome</b> or <b>Edge</b>, click the install icon at the right end of the address bar, or open the <b>⋮</b> menu and choose <b>Install FitX Parts</b> (Edge: <b>Apps → Install this site as an app</b>).';
+  }
+  if(ios) btn.hidden=false;
+  btn.onclick=async()=>{
+    if(deferred){ deferred.prompt(); const r=await deferred.userChoice; deferred=null; if(r.outcome!=="accepted") btn.hidden=false; else btn.hidden=true; return }
+    $("insText").innerHTML=howTo(); $("insBg").hidden=false;
+  };
+  $("insClose").onclick=()=>$("insBg").hidden=true;
+  $("insBg").addEventListener("click",e=>{if(e.target.id==="insBg")$("insBg").hidden=true});
+  // Show the button on desktop/Android after a moment even if the browser hasn't offered its prompt yet
+  setTimeout(()=>{ if(!deferred&&!ios) btn.hidden=false },4000);
+})();
 
 // ---------- Phone app polish ----------
 function tick(){ try{ if(isApp) window.Capacitor.Plugins.Haptics.impact({style:"LIGHT"}) }catch(e){} }
