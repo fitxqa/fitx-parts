@@ -1,0 +1,76 @@
+name: Build FitX Parts APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install Capacitor
+        run: npm install
+
+      - name: Create Android project
+        run: |
+          npx cap add android
+          npx @capacitor/assets generate --android --iconBackgroundColor '#000000' --splashBackgroundColor '#ffffff'
+          npx cap sync android
+
+      - name: Set version
+        run: |
+          sed -i "s/versionCode 1$/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          sed -i "s/versionName \"1.0\"/versionName \"1.0.${{ github.run_number }}\"/" android/app/build.gradle
+
+      - name: Build release APK
+        run: cd android && chmod +x gradlew && ./gradlew assembleRelease
+
+      - name: Sign APK
+        env:
+          KS_B64: ${{ secrets.FITX_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.FITX_KEYSTORE_PASS }}
+        run: |
+          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+          IN=android/app/build/outputs/apk/release/app-release-unsigned.apk
+          OUT=FitX-Parts-1.0.${{ github.run_number }}.apk
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > fitx.jks
+            ALIAS=$(keytool -list -keystore fitx.jks -storepass "$KS_PASS" | grep -m1 PrivateKeyEntry | cut -d, -f1)
+            echo "Signing with key alias: $ALIAS"
+          else
+            echo "::warning::No FITX_KEYSTORE_B64 secret. Using a temporary key: each new APK must be uninstalled before installing."
+            KS_PASS=fitxtemp; ALIAS=fitx
+            keytool -genkeypair -keystore fitx.jks -storepass $KS_PASS -keypass $KS_PASS -alias $ALIAS -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=FitX, O=FitX Sports Equipment Services, C=QA"
+          fi
+          $BT/zipalign -p 4 "$IN" aligned.apk
+          $BT/apksigner sign --ks fitx.jks --ks-pass pass:"$KS_PASS" --key-pass pass:"$KS_PASS" --ks-key-alias "$ALIAS" --out "$OUT" aligned.apk
+          $BT/apksigner verify "$OUT"
+          rm -f fitx.jks
+          echo "APK=$OUT" >> $GITHUB_ENV
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FitX-Parts-APK
+          path: ${{ env.APK }}
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: FitX Parts 1.0.${{ github.run_number }}
+          files: ${{ env.APK }}

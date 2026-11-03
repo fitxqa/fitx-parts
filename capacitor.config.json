@@ -1,0 +1,8 @@
+{
+  "appId": "qa.fitx.parts",
+  "appName": "FitX Parts",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#ffffff"
+  }
+}

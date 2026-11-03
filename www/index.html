@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<link rel="icon" href="icon.png">
+<title>FitX Parts Bin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Semi+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* FitX brand, light: white ground, black "Fit" + orange "X", orange rules. Layout: sticky header with stock summary, two tabs (Inventory list, Availability check), bottom sheet for editing one part. Solder-mask green + copper on a cool board-grey. */
+:root{
+  --bg:#f6f6f6; --surface:#ffffff; --sunk:#f1f1f1; --ink:#141414; --muted:#666666; --line:#e3e3e3;
+  --accent:#f26200; --accent-ink:#ffffff; --copper:#c24e00;
+  --ok:#1d7a46; --ok-bg:#e3f4ea; --warn:#9a5b00; --warn-bg:#fff1dc; --bad:#c0302a; --bad-bg:#fde6e4;
+  --display:"Saira Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+[hidden]{display:none!important}
+img{max-width:100%}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--body);padding-bottom:env(safe-area-inset-bottom,0px);-webkit-tap-highlight-color:transparent}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:980px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:#fff}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:#fff;border-bottom:3px solid var(--accent)}
+header .wrap{padding-block:14px 0;display:grid;gap:12px}
+.brand{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:12px}
+.mark{font:700 2.1rem/1 var(--display);letter-spacing:-.02em;color:#111}
+.mark b{color:var(--accent);font-weight:700}
+.logo-sub{display:grid;line-height:1.15;border-left:2px solid var(--accent);padding-left:10px}
+.logo-sub small{font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+h1{font:700 1.15rem/1.1 var(--display);letter-spacing:.04em;text-transform:uppercase;margin:0}
+.sync{font-size:.78rem;color:var(--muted)}
+.stats{display:flex;gap:18px;flex-wrap:wrap;font-variant-numeric:tabular-nums}
+.stat{display:flex;align-items:baseline;gap:6px;font-size:.85rem;color:var(--muted)}
+.stat b{font:600 1.15rem var(--mono);color:var(--ink)}
+.stat.low b{color:var(--warn)} .stat.out b{color:var(--bad)}
+.tabs{display:flex;gap:4px}
+.tab{border:0;background:none;padding:10px 12px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent}
+.tab[aria-selected="true"]{color:var(--ink);border-color:var(--accent)}
+main .wrap{padding-block:16px 48px;display:grid;gap:14px}
+.toolbar{display:grid;gap:10px}
+.search{display:flex;gap:8px}
+input[type=search],input[type=text],input[type=number],input[type=email],input[type=password],select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%;min-width:0}
+textarea{font-family:var(--mono);font-size:.9rem;min-height:150px;resize:vertical}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 14px;font-weight:600;white-space:nowrap}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.danger{color:var(--bad)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:.82rem;white-space:nowrap;color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.chip .n{font-family:var(--mono);opacity:.7;margin-left:4px}
+.chip.add{border-style:dashed;color:var(--accent);border-color:var(--accent)}
+.catlist{display:grid;gap:6px}
+.catitem{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:8px}
+.catitem .n{font-family:var(--mono);color:var(--muted);font-size:.82rem}
+.status-row{display:flex;gap:6px;flex-wrap:wrap}
+.note{font-size:.85rem;color:var(--muted)}
+.list{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 12px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.part{border:0;background:none;text-align:left;padding:0;min-width:0;display:grid;gap:2px}
+.pname{font:600 .98rem var(--mono);display:flex;align-items:center;gap:8px;flex-wrap:wrap;overflow-wrap:anywhere}
+.pmeta{font-size:.8rem;color:var(--muted);overflow-wrap:anywhere}
+.pmeta .bin{color:var(--copper);font-family:var(--mono)}
+.bands{display:inline-flex;align-items:center;height:12px;padding:0 5px;border-radius:6px;background:#d9c39a;gap:2px}
+.bands i{width:3px;height:12px;display:block}
+.ctrl{display:flex;align-items:center;gap:6px}
+.step{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--sunk);font:600 1.1rem var(--mono);display:grid;place-items:center;padding:0}
+.qty{min-width:64px;text-align:center;border-radius:999px;padding:4px 10px;font:600 .9rem var(--mono);font-variant-numeric:tabular-nums}
+.st-ok,.st-in{background:var(--ok-bg);color:var(--ok)} .st-low{background:var(--warn-bg);color:var(--warn)} .st-out{background:var(--bad-bg);color:var(--bad)}
+.more{display:flex;justify-content:center;padding:12px}
+.empty{padding:28px 16px;text-align:center;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:10px}
+h2{font:700 1.15rem var(--display);margin:0;letter-spacing:.01em}
+.bom-table{width:100%;border-collapse:collapse;font-size:.88rem}
+.bom-wrap{overflow-x:auto}
+.bom-table th{text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line)}
+.bom-table td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+.bom-table td.num{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.verdict{padding:10px 12px;border-radius:8px;font-weight:600}
+.sheet-bg{position:fixed;inset:0;background:rgba(20,20,20,.4);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);width:100%;max-width:520px;border-radius:14px 14px 0 0;padding:18px max(16px,env(safe-area-inset-left,0px)) calc(18px + env(safe-area-inset-bottom,0px));display:grid;gap:12px;max-height:90vh;overflow:auto}
+@media (min-width:640px){.sheet-bg{align-items:center}.sheet{border-radius:14px}}
+.field{display:grid;gap:4px;font-size:.82rem;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.hdr-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.linkbtn{border:0;background:none;color:var(--accent);font-weight:600;font-size:.82rem;padding:4px 2px}
+#login{min-height:100vh;display:grid;place-items:center;padding:24px max(16px,env(safe-area-inset-left,0px));background:#fff}
+.login-card{width:100%;max-width:380px;display:grid;gap:14px}
+.login-card .mark{font-size:3.4rem}
+.login-card .logo-sub small{font-size:.72rem}
+.err{color:var(--bad);font-size:.88rem;min-height:1.2em}
+.bk-sec{display:grid;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+h3{font:700 .95rem var(--display);letter-spacing:.04em;text-transform:uppercase;margin:0}
+.actions.start{justify-content:flex-start}
+.linkbtn.due{color:var(--bad)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:.88rem;z-index:30;max-width:calc(100% - 32px)}
+@media (prefers-reduced-motion:no-preference){.qty{transition:background .2s,color .2s}}
+</style>
+</head>
+<body>
+<div id="login" hidden>
+  <form class="login-card" id="loginForm">
+    <div class="logo"><span class="mark" aria-hidden="true">Fit<b>X</b></span><div class="logo-sub"><small>Sports Equipment Services</small><h1>Parts Bin Stock</h1></div></div>
+    <label class="field">Email<input type="email" id="lEmail" autocomplete="username" required></label>
+    <label class="field">Password<input type="password" id="lPass" autocomplete="current-password" required></label>
+    <div class="err" id="lErr" role="alert"></div>
+    <button class="btn primary" type="submit" id="lBtn">Sign in</button>
+    <button class="linkbtn" type="button" id="lReset">Forgot password?</button>
+  </form>
+</div>
+<div id="app" hidden>
+
+<header>
+  <div class="wrap">
+    <div class="brand">
+      <div class="logo" aria-label="FitX Sports Equipment Services"><span class="mark" aria-hidden="true">Fit<b>X</b></span><div class="logo-sub"><small>Sports Equipment Services</small><h1>Parts Bin Stock</h1></div></div>
+      <div class="hdr-actions"><span class="sync" id="sync">Connecting…</span><button class="linkbtn" id="backupOpen">Backup</button><button class="linkbtn" id="signOut" hidden>Sign out</button></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="sTotal">0</b> parts in catalog</div>
+      <div class="stat"><b id="sIn">0</b> in stock</div>
+      <div class="stat low"><b id="sLow">0</b> low</div>
+      <div class="stat out"><b id="sOut">0</b> out</div>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tabInv" aria-selected="true">Inventory</button>
+      <button class="tab" role="tab" id="tabChk" aria-selected="false">Check availability</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="wrap" id="viewInv">
+    <div class="toolbar">
+      <div class="search">
+        <input type="search" id="q" placeholder="Search part, value or package (e.g. 10k, LM358, SOT-23)" aria-label="Search parts">
+        <button class="btn primary" id="addBtn">Add part</button>
+      </div>
+      <div class="chips" id="cats" aria-label="Category"></div>
+      <div class="status-row" id="stFilter" aria-label="Stock status">
+        <button class="chip" data-st="all" aria-pressed="true">All</button>
+        <button class="chip" data-st="in" aria-pressed="false">In stock</button>
+        <button class="chip" data-st="low" aria-pressed="false">Low</button>
+        <button class="chip" data-st="out" aria-pressed="false">Out of stock</button>
+      </div>
+    </div>
+    <div class="note" id="count"></div>
+    <div class="list" id="list"></div>
+    <div class="more" id="moreBox" hidden><button class="btn" id="moreBtn">Show more</button></div>
+  </div>
+
+  <div class="wrap" id="viewChk" hidden>
+    <div class="card">
+      <h2>Quick check</h2>
+      <input type="search" id="qc" placeholder="Type a part name, e.g. NE555 or 100nF" aria-label="Check one part">
+      <div id="qcOut" class="note">Type a part to see how many you have and where they are.</div>
+    </div>
+    <div class="card">
+      <h2>Check a parts list (BOM)</h2>
+      <div class="note">One part per line with the quantity you need, like <code>LM358, 2</code> or <code>4x 10k</code>. The example below is a 555 blinker.</div>
+      <textarea id="bom" aria-label="Parts list">NE555, 1
+10k, 2
+100uF, 1
+10nF, 1
+LED 5mm red, 2
+330R, 2
+9V battery clip, 1</textarea>
+      <div class="actions"><button class="btn primary" id="bomBtn">Check list</button></div>
+      <div id="bomOut"></div>
+    </div>
+  </div>
+</main>
+
+<div class="sheet-bg" id="sheetBg" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="shTitle">
+    <h2 id="shTitle">Edit part</h2>
+    <div id="shCustom" class="grid2">
+      <label class="field" style="grid-column:1/-1">Part name<input type="text" id="fName" placeholder="e.g. LM2903"></label>
+      <label class="field">Category<select id="fCat"></select></label>
+      <label class="field">Package<input type="text" id="fPkg" placeholder="DIP-8, SOT-23…"></label>
+      <label class="field" id="fNewCatBox" style="grid-column:1/-1" hidden>New category name<input type="text" id="fNewCat" placeholder="e.g. Treadmill boards"></label>
+      <label class="field" style="grid-column:1/-1">Description<input type="text" id="fSpec" placeholder="Dual comparator"></label>
+    </div>
+    <div id="shInfo" class="note"></div>
+    <div class="grid2">
+      <label class="field">Quantity on hand<input type="number" id="fQty" min="0" inputmode="numeric"></label>
+      <label class="field">Low-stock level<input type="number" id="fMin" min="0" inputmode="numeric"></label>
+      <label class="field" style="grid-column:1/-1">Bin / drawer location<input type="text" id="fBin" placeholder="e.g. Drawer A3"></label>
+    </div>
+    <div class="actions">
+      <button class="btn danger" id="shDel" hidden>Delete part</button>
+      <button class="btn" id="shCancel">Cancel</button>
+      <button class="btn primary" id="shSave">Save</button>
+    </div>
+  </div>
+</div>
+<div class="sheet-bg" id="catBg" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="catTitle">
+    <h2 id="catTitle">Categories</h2>
+    <div class="search"><input type="text" id="catName" placeholder="New category, e.g. Treadmill boards" aria-label="New category name"><button class="btn primary" id="catAdd">Add</button></div>
+    <div class="note">Your categories. A category can be deleted once no parts use it.</div>
+    <div class="catlist" id="catList"></div>
+    <div class="actions"><button class="btn" id="catClose">Done</button></div>
+  </div>
+</div>
+<div class="sheet-bg" id="bkBg" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="bkTitle">
+    <h2 id="bkTitle">Backup</h2>
+    <div class="note" id="bkLast">No backup recorded yet.</div>
+    <section id="gdWeb" class="bk-sec">
+      <h3>Google Drive</h3>
+      <div class="note">Saves to the <b>FitX Parts Backups</b> folder in the Google account you choose.</div>
+      <div class="actions start"><button class="btn primary" id="gdBackup">Back up to Google Drive</button><button class="btn" id="gdList">Restore from Drive</button></div>
+      <div class="catlist" id="gdFiles"></div>
+    </section>
+    <section id="gdApp" class="bk-sec" hidden>
+      <h3>Google Drive</h3>
+      <div class="note">Tap <b>Share backup</b>, then choose <b>Drive</b> and pick the <b>FitX Parts Backups</b> folder.</div>
+      <div class="actions start"><button class="btn primary" id="shBackup">Share backup</button></div>
+    </section>
+    <section class="bk-sec">
+      <h3>Backup file</h3>
+      <div class="actions start"><button class="btn" id="bkDownload">Download backup file</button><button class="btn" id="bkCopy">Copy backup text</button></div>
+    </section>
+    <section class="bk-sec">
+      <h3>Restore from a file</h3>
+      <div class="note">Parts in the backup get the counts from the backup; other parts are left as they are.</div>
+      <input type="file" id="bkFile" accept=".json,application/json" aria-label="Backup file">
+      <div class="actions"><button class="btn primary" id="bkImport" disabled>Restore</button></div>
+    </section>
+    <div class="actions"><button class="btn" id="bkClose">Close</button></div>
+  </div>
+</div>
+</div><!-- /app -->
+<div class="toast" id="toast" hidden></div>
+<script src="vendor/firebase-app-compat.js"></script>
+<script src="vendor/firebase-auth-compat.js"></script>
+<script src="vendor/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+
+<script>
+// ---------- Catalog ----------
+const CATS=["Resistor","Capacitor","Diode","LED","Transistor","Regulator","IC","Microcontroller","Sensor","Module","Display","Passive","Switch","Connector","Electromech","Power"];
+const C=[];
+const SEEN=new Set();
+function add(cat,name,spec,pkg){let id=mkid(cat+"-"+name);if(SEEN.has(id))id=mkid(cat+"-"+name+"-"+spec);SEEN.add(id);C.push({id,cat,name,spec,pkg})}
+function mkid(x){return x.toLowerCase().replace(/µ/g,"u").replace(/Ω/g,"r").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")}
+function fmtR(v){if(v>=1e6)return trim(v/1e6)+"MΩ";if(v>=1e3)return trim(v/1e3)+"kΩ";return trim(v)+"Ω"}
+function trim(n){return (+n.toFixed(2)).toString()}
+const E12=[1,1.2,1.5,1.8,2.2,2.7,3.3,3.9,4.7,5.6,6.8,8.2];
+[1,10,100,1e3,1e4,1e5].forEach(d=>E12.forEach(m=>{const v=Math.round(m*d*10*100)/100; if(v<=1e6) add("Resistor",fmtR(v),"Carbon film 1/4W 5%","THT axial")}));
+["0Ω","10Ω","100Ω","330Ω","1kΩ","4.7kΩ","10kΩ","100kΩ"].forEach(n=>add("Resistor",n+" SMD","Thick film 1%","0805"));
+["1kΩ","10kΩ"].forEach(n=>add("Resistor",n+" network","9-pin bussed array","SIP-9"));
+["10pF","22pF","33pF","47pF","100pF","220pF","470pF","1nF","2.2nF","4.7nF","10nF","22nF","47nF","100nF","220nF","470nF","1µF"].forEach(v=>add("Capacitor",v,"Ceramic 50V","THT radial"));
+["100nF","1µF","10µF"].forEach(v=>add("Capacitor",v+" SMD","MLCC X7R","0805"));
+[["1µF","50V"],["2.2µF","50V"],["4.7µF","50V"],["10µF","25V"],["22µF","25V"],["47µF","25V"],["100µF","25V"],["220µF","25V"],["470µF","25V"],["1000µF","16V"],["2200µF","16V"],["4700µF","16V"]].forEach(([v,V])=>add("Capacitor",v,"Electrolytic "+V,"THT radial"));
+["10nF","100nF","1µF"].forEach(v=>add("Capacitor",v+" film","Polyester film 100V","THT"));
+["10µF","100µF"].forEach(v=>add("Capacitor",v+" tantalum","Tantalum 16V","THT/1206"));
+[["1N4148","Small-signal switching 100V","DO-35"],["1N4001","Rectifier 1A 50V","DO-41"],["1N4007","Rectifier 1A 1000V","DO-41"],["1N5408","Rectifier 3A 1000V","DO-201"],["1N5819","Schottky 1A 40V","DO-41"],["1N5822","Schottky 3A 40V","DO-201"],["UF4007","Ultrafast 1A 1000V","DO-41"],["FR107","Fast recovery 1A","DO-41"],["BAT54","Schottky 30V","SOT-23"],["SS34","Schottky 3A 40V","SMA"],["M7","Rectifier 1A 1000V","SMA"],["KBP307","Bridge rectifier 3A","KBP"],["DB107","Bridge rectifier 1A","DIP-4"],["1N4728A","Zener 3.3V 1W","DO-41"],["1N4733A","Zener 5.1V 1W","DO-41"],["1N4735A","Zener 6.2V 1W","DO-41"],["1N4739A","Zener 9.1V 1W","DO-41"],["1N4742A","Zener 12V 1W","DO-41"],["1N4744A","Zener 15V 1W","DO-41"],["1N4746A","Zener 18V 1W","DO-41"],["1N4749A","Zener 24V 1W","DO-41"],["P6KE18A","TVS 18V","DO-15"]].forEach(a=>add("Diode",...a));
+["red","green","blue","yellow","white","orange"].forEach(c=>{add("LED","LED 5mm "+c,"Standard brightness","5mm THT");add("LED","LED 3mm "+c,"Standard brightness","3mm THT")});
+[["LED 5mm RGB","Common cathode","5mm THT"],["LED 5mm IR 940nm","Infrared emitter","5mm THT"],["IR photodiode","940nm receiver","5mm THT"],["WS2812B","Addressable RGB LED","5050 SMD"],["LED 0805 red","Indicator","0805"],["LED 0805 green","Indicator","0805"]].forEach(a=>add("LED",...a));
+[["BC547","NPN 45V 100mA"],["BC548","NPN 30V 100mA"],["BC557","PNP 45V 100mA"],["BC337","NPN 45V 800mA"],["BC327","PNP 45V 800mA"],["2N2222A","NPN 40V 600mA"],["2N3904","NPN 40V 200mA"],["2N3906","PNP 40V 200mA"],["S8050","NPN 25V 500mA"],["S8550","PNP 25V 500mA"],["2N7000","N-MOSFET 60V 200mA"],["BS170","N-MOSFET 60V 500mA"]].forEach(([n,s])=>add("Transistor",n,s,"TO-92"));
+[["TIP120","NPN Darlington 60V 5A"],["TIP122","NPN Darlington 100V 5A"],["TIP31C","NPN 100V 3A"],["TIP32C","PNP 100V 3A"],["TIP41C","NPN 100V 6A"],["TIP42C","PNP 100V 6A"],["IRF540N","N-MOSFET 100V 33A"],["IRFZ44N","N-MOSFET 55V 49A"],["IRF9540N","P-MOSFET 100V 23A"],["IRLZ44N","Logic-level N-MOSFET 55V 47A"],["IRF3205","N-MOSFET 55V 110A"],["MJE13005","NPN 400V 4A"]].forEach(([n,s])=>add("Transistor",n,s,"TO-220"));
+[["BD139","NPN 80V 1.5A","TO-126"],["BD140","PNP 80V 1.5A","TO-126"],["AO3400","N-MOSFET 30V 5.7A","SOT-23"],["AO3401","P-MOSFET 30V 4A","SOT-23"],["MMBT3904","NPN 40V","SOT-23"],["BT136","TRIAC 600V 4A","TO-220"],["BT139","TRIAC 600V 16A","TO-220"]].forEach(a=>add("Transistor",...a));
+[["LM7805","+5V 1.5A linear","TO-220"],["LM7809","+9V 1.5A linear","TO-220"],["LM7812","+12V 1.5A linear","TO-220"],["LM7905","−5V 1.5A linear","TO-220"],["LM7912","−12V 1.5A linear","TO-220"],["78L05","+5V 100mA linear","TO-92"],["LM317T","Adjustable 1.2–37V 1.5A","TO-220"],["LM337T","Adjustable negative","TO-220"],["AMS1117-3.3","3.3V 1A LDO","SOT-223"],["AMS1117-5.0","5V 1A LDO","SOT-223"],["LD1117V33","3.3V 800mA LDO","TO-220"],["HT7333","3.3V 250mA LDO","TO-92"],["LM2596S-ADJ","Buck regulator 3A","TO-263"],["MC34063","Buck/boost controller","DIP-8"],["TL431","Adjustable shunt reference","TO-92"]].forEach(a=>add("Regulator",...a));
+[["NE555","Timer","DIP-8"],["NE556","Dual timer","DIP-14"],["LM358","Dual op-amp","DIP-8"],["LM324","Quad op-amp","DIP-14"],["LM741","Single op-amp","DIP-8"],["TL071","JFET op-amp","DIP-8"],["TL072","Dual JFET op-amp","DIP-8"],["TL074","Quad JFET op-amp","DIP-14"],["LM393","Dual comparator","DIP-8"],["LM339","Quad comparator","DIP-14"],["LM386","Audio amplifier 0.5W","DIP-8"],["TDA2030A","Audio amplifier 14W","TO-220-5"],["PAM8403","Class-D stereo 3W","SOP-16"],["74HC00","Quad NAND","DIP-14"],["74HC02","Quad NOR","DIP-14"],["74HC04","Hex inverter","DIP-14"],["74HC08","Quad AND","DIP-14"],["74HC14","Hex Schmitt inverter","DIP-14"],["74HC32","Quad OR","DIP-14"],["74HC86","Quad XOR","DIP-14"],["74HC138","3-to-8 decoder","DIP-16"],["74HC165","Parallel-in shift register","DIP-16"],["74HC595","Serial-in shift register","DIP-16"],["74HC244","Octal buffer","DIP-20"],["74HC245","Octal transceiver","DIP-20"],["74HC4051","8-ch analog mux","DIP-16"],["CD4011","Quad NAND (CMOS)","DIP-14"],["CD4017","Decade counter","DIP-16"],["CD4040","12-stage counter","DIP-16"],["CD4051","8-ch analog mux","DIP-16"],["CD4060","Counter + oscillator","DIP-16"],["CD4066","Quad bilateral switch","DIP-14"],["ULN2003A","7-ch Darlington driver","DIP-16"],["ULN2803A","8-ch Darlington driver","DIP-18"],["L293D","Dual H-bridge 600mA","DIP-16"],["L298N","Dual H-bridge 2A","Multiwatt-15"],["PC817","Optocoupler","DIP-4"],["MOC3021","TRIAC optocoupler","DIP-6"],["MOC3041","Zero-cross TRIAC opto","DIP-6"],["6N137","High-speed optocoupler","DIP-8"],["MAX232","RS-232 transceiver","DIP-16"],["MAX485","RS-485 transceiver","DIP-8"],["CH340G","USB to UART","SOP-16"],["FT232RL","USB to UART","SSOP-28"],["24C02","EEPROM 2Kbit I2C","DIP-8"],["24C256","EEPROM 256Kbit I2C","DIP-8"],["DS1307","RTC I2C","DIP-8"],["DS3231","Precision RTC I2C","SOIC-16"],["PCF8574","I2C 8-bit I/O expander","DIP-16"],["MCP23017","I2C 16-bit I/O expander","DIP-28"],["MCP3008","8-ch 10-bit ADC SPI","DIP-16"],["ADS1115","16-bit ADC I2C","MSOP-10"],["MCP4725","12-bit DAC I2C","SOT-23-6"],["TP4056","Li-ion charger 1A","SOP-8"],["IR2104","Half-bridge driver","DIP-8"],["IR2110","High/low side driver","DIP-14"],["TL494","PWM controller","DIP-16"],["SG3525","PWM controller","DIP-16"],["UC3842","Current-mode PWM","DIP-8"]].forEach(a=>add("IC",...a));
+[["ATmega328P-PU","8-bit AVR 32KB","DIP-28"],["ATmega328P-AU","8-bit AVR 32KB","TQFP-32"],["ATmega2560","8-bit AVR 256KB","TQFP-100"],["ATtiny85","8-bit AVR 8KB","DIP-8"],["ATtiny13A","8-bit AVR 1KB","DIP-8"],["PIC16F877A","8-bit PIC","DIP-40"],["PIC12F675","8-bit PIC","DIP-8"],["STM32F103C8T6","ARM Cortex-M3","LQFP-48"],["ESP32-WROOM-32","Wi-Fi + BT module","SMD module"],["ESP-12F","ESP8266 Wi-Fi module","SMD module"],["RP2040","Dual Cortex-M0+","QFN-56"]].forEach(a=>add("Microcontroller",...a));
+[["DHT11","Temp + humidity","Module"],["DHT22","Temp + humidity (precise)","Module"],["DS18B20","1-Wire temperature","TO-92"],["DS18B20 probe","Waterproof temp probe 1m","Cable"],["LM35","Analog temperature","TO-92"],["NTC 10k","Thermistor B3950","THT"],["BMP280","Pressure + temp I2C","Module"],["BME280","Pressure + humidity + temp","Module"],["MPU6050","6-axis accel + gyro","Module"],["HC-SR04","Ultrasonic distance","Module"],["HC-SR501","PIR motion","Module"],["LDR 5mm","Light dependent resistor","THT"],["ACS712-5A","Current sensor 5A","Module"],["ACS712-20A","Current sensor 20A","Module"],["INA219","Current/voltage I2C","Module"],["MQ-2","Gas/smoke","Module"],["MQ-135","Air quality","Module"],["VS1838B","IR receiver 38kHz","THT"],["TCRT5000","IR reflective","Module"],["A3144","Hall effect switch","TO-92"],["HX711","Load cell amplifier","Module"],["Load cell 5kg","Strain gauge bar","Bar"],["Soil moisture sensor","Capacitive","Module"],["Water flow sensor YF-S201","Hall flow meter","Inline"],["Reed switch","Magnetic contact","Glass THT"]].forEach(a=>add("Sensor",...a));
+[["Arduino Uno R3","ATmega328P board","Board"],["Arduino Nano","ATmega328P, CH340","Board"],["Arduino Mega 2560","ATmega2560 board","Board"],["Arduino Pro Mini 5V","ATmega328P 16MHz","Board"],["ESP32 DevKit V1","ESP32 dev board","Board"],["NodeMCU ESP8266","ESP-12E dev board","Board"],["Raspberry Pi Pico","RP2040 board","Board"],["STM32 Blue Pill","STM32F103 board","Board"],["Relay module 1ch 5V","10A contacts","Module"],["Relay module 2ch 5V","10A contacts","Module"],["Relay module 4ch 5V","10A contacts","Module"],["HC-05","Bluetooth serial","Module"],["nRF24L01+","2.4GHz transceiver","Module"],["RC522","RFID 13.56MHz reader","Module"],["SIM800L","GSM/GPRS","Module"],["NEO-6M","GPS receiver","Module"],["Micro SD card module","SPI","Module"],["LM2596 buck module","3A step-down adjustable","Module"],["XL6009 boost module","4A step-up adjustable","Module"],["MT3608 boost module","2A step-up","Module"],["MP1584 buck module","3A mini step-down","Module"],["TP4056 charger module","Li-ion 1A, USB-C","Module"],["L298N driver module","Dual motor driver","Module"],["A4988 stepper driver","2A microstepping","Module"],["DRV8825 stepper driver","2.5A microstepping","Module"],["PCA9685","16-ch PWM servo driver","Module"],["MAX7219 dot matrix","8x8 LED, SPI","Module"],["DS3231 RTC module","With battery holder","Module"],["Logic level converter","4-ch 3.3V/5V","Module"],["USB-TTL CP2102","Serial adapter","Module"]].forEach(a=>add("Module",...a));
+[["LCD 16x2","HD44780, blue backlight","Module"],["LCD 20x4","HD44780","Module"],["I2C LCD adapter","PCF8574 backpack","Module"],["OLED 0.96in I2C","SSD1306 128x64","Module"],["OLED 1.3in I2C","SH1106 128x64","Module"],["TFT 1.8in SPI","ST7735 128x160","Module"],["7-segment 1 digit","Common cathode 0.56in","THT"],["7-segment 4 digit","Common anode 0.56in","THT"],["TM1637 4-digit","Display module","Module"]].forEach(a=>add("Display",...a));
+[["Potentiometer 1k","Linear rotary","THT"],["Potentiometer 10k","Linear rotary","THT"],["Potentiometer 100k","Linear rotary","THT"],["Trimmer 10k","3296 multi-turn","THT"],["Trimmer 100k","3296 multi-turn","THT"],["Crystal 8MHz","HC-49","THT"],["Crystal 12MHz","HC-49","THT"],["Crystal 16MHz","HC-49","THT"],["Crystal 32.768kHz","Watch crystal","Cylinder"],["Inductor 10µH","Radial power","THT"],["Inductor 47µH","Radial power","THT"],["Inductor 100µH","Radial power","THT"],["Ferrite bead","EMI suppression","THT"],["Buzzer active 5V","Built-in oscillator","THT"],["Buzzer passive","Piezo transducer","THT"],["Fuse 1A","Glass 5x20mm","Cartridge"],["Fuse 5A","Glass 5x20mm","Cartridge"],["PTC fuse 500mA","Resettable","THT"],["Varistor 14D471","MOV 300VAC","THT"]].forEach(a=>add("Passive",...a));
+[["Push button 6x6","Tactile momentary","THT"],["Push button 12x12","Tactile with cap","THT"],["Slide switch SPDT","Mini","THT"],["Toggle switch SPDT","Panel mount","Panel"],["Rocker switch","KCD1 2-pin","Panel"],["DIP switch 8-way","Piano type","DIP-16"],["Rotary encoder","EC11 with push","THT"],["Micro limit switch","Lever SPDT","THT"],["Relay 5V SPDT","SRD-05VDC 10A","THT"],["Relay 12V SPDT","SRD-12VDC 10A","THT"]].forEach(a=>add("Switch",...a));
+[["Pin header male 1x40","2.54mm","THT"],["Pin header female 1x40","2.54mm","THT"],["Pin header male 2x40","2.54mm","THT"],["JST-XH 2-pin","2.54mm socket + plug","THT"],["JST-XH 3-pin","2.54mm socket + plug","THT"],["JST-XH 4-pin","2.54mm socket + plug","THT"],["Screw terminal 2P","5.08mm","THT"],["Screw terminal 3P","5.08mm","THT"],["DC barrel jack","5.5x2.1mm","THT"],["USB-C socket","16-pin","SMD"],["Micro USB socket","5-pin","SMD"],["IC socket 8-pin","DIP","THT"],["IC socket 14-pin","DIP","THT"],["IC socket 16-pin","DIP","THT"],["IC socket 28-pin","DIP narrow","THT"],["Dupont wires M-M","20cm, 40 pcs","Bundle"],["Dupont wires M-F","20cm, 40 pcs","Bundle"],["Dupont wires F-F","20cm, 40 pcs","Bundle"],["Breadboard 830","Full size","Board"],["Perfboard 7x9cm","Double sided","Board"]].forEach(a=>add("Connector",...a));
+[["Servo SG90","9g micro servo","Motor"],["Servo MG996R","Metal gear servo","Motor"],["Stepper 28BYJ-48","5V geared stepper","Motor"],["Stepper NEMA 17","1.8° 1.5A","Motor"],["DC motor TT gear","3–6V yellow gearmotor","Motor"],["Vibration motor","Coin type 3V","Motor"],["Speaker 8Ω 0.5W","40mm","Speaker"],["Fan 5V 40mm","Brushless","Fan"],["Fan 12V 80mm","Brushless","Fan"]].forEach(a=>add("Electromech",...a));
+[["18650 cell","Li-ion 3.7V","Cell"],["18650 holder 1-cell","Battery holder","THT"],["CR2032","Coin cell 3V","Cell"],["CR2032 holder","Coin cell holder","THT"],["9V battery clip","Snap with leads","Cable"],["AA holder 4-cell","With leads","Holder"],["12V 2A adapter","5.5x2.1mm plug","Adapter"],["5V 2A adapter","USB","Adapter"]].forEach(a=>add("Power",...a));
+
+// ---------- State ----------
+const stock={};          // id -> {qty,min,bin}
+const custom={};         // id -> {name,cat,spec,pkg}
+const customCats={};     // id -> name
+let catCol=null;
+function cats(){return CATS.concat(Object.values(customCats).filter(n=>!CATS.includes(n)).sort((a,b)=>a.localeCompare(b)))}
+function catId(n){return "cat-"+n.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,60)}
+let col=null, local=false, readOnly=false;
+const DEFAULT_MIN=5;
+let state={cat:"All",st:"all",q:"",limit:80};
+
+const $=id=>document.getElementById(id);
+function all(){return C.concat(Object.entries(custom).map(([id,c])=>({id,custom:true,...c})))}
+function rec(id){return stock[id]||{qty:0,min:DEFAULT_MIN,bin:""}}
+function status(id){const r=rec(id);const min=r.min??DEFAULT_MIN;return r.qty<=0?"out":r.qty<=min?"low":"in"}
+function norm(s){return String(s).toLowerCase().replace(/µ/g,"u").replace(/[Ωω\u2126]|ohms?\b/g,"").replace(/(\d)r(\d)/g,"$1.$2").replace(/(\d)r\b/g,"$1").replace(/[\s\-_,]+/g,"")}
+
+// ---------- Resistor colour bands ----------
+const BAND=["#111","#7b4a1e","#d22","#f37a12","#f2d21b","#2a9d3f","#2456d6","#7d3ac1","#888","#f5f5f5"];
+function bandsFor(name){
+  const m=name.match(/^([\d.]+)(k|M)?Ω$/); if(!m) return "";
+  let v=parseFloat(m[1])*(m[2]==="k"?1e3:m[2]==="M"?1e6:1); if(v<10) return "";
+  const s=Math.round(v).toString(); const d1=+s[0], d2=+s[1], mult=s.length-2;
+  if(mult>9) return "";
+  return `<span class="bands" aria-hidden="true"><i style="background:${BAND[d1]}"></i><i style="background:${BAND[d2]}"></i><i style="background:${BAND[mult]}"></i><i style="background:#c9a64a;margin-left:3px"></i></span>`;
+}
+function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+
+// ---------- Render ----------
+function renderStats(){
+  const items=all(); let i=0,l=0,o=0;
+  items.forEach(p=>{const s=status(p.id); if(s==="out")o++; else{i++; if(s==="low")l++}});
+  $("sTotal").textContent=items.length; $("sIn").textContent=i; $("sLow").textContent=l; $("sOut").textContent=o;
+}
+function renderCats(){
+  const items=all(); const counts={All:items.length}; items.forEach(p=>counts[p.cat]=(counts[p.cat]||0)+1);
+  const mine=new Set(Object.values(customCats));
+  $("cats").innerHTML=["All",...cats()].filter(c=>counts[c]||mine.has(c)).map(c=>`<button class="chip" data-cat="${esc(c)}" aria-pressed="${state.cat===c}">${esc(c)}<span class="n">${counts[c]||0}</span></button>`).join("")+`<button class="chip add" id="catOpen">+ Category</button>`;
+}
+function filtered(){
+  const q=norm(state.q);
+  return all().filter(p=>(state.cat==="All"||p.cat===state.cat)
+    &&(state.st==="all"||(state.st==="in"?status(p.id)!=="out":status(p.id)===state.st))
+    &&(!q||norm(p.name+" "+p.spec+" "+p.pkg+" "+p.cat+" "+(rec(p.id).bin||"")).includes(q)))
+    .sort((a,b)=>{ if(!q) return 0; const an=norm(a.name)===q?0:norm(a.name).startsWith(q)?1:2, bn=norm(b.name)===q?0:norm(b.name).startsWith(q)?1:2; return an-bn});
+}
+function rowHTML(p){
+  const r=rec(p.id), s=status(p.id), label=s==="out"?"Out":r.qty;
+  return `<div class="row" data-id="${p.id}">
+    <button class="part" data-edit="${p.id}" aria-label="Edit ${esc(p.name)}">
+      <span class="pname">${esc(p.name)} ${p.cat==="Resistor"?bandsFor(p.name):""}</span>
+      <span class="pmeta">${esc(p.cat)} · ${esc(p.spec)} · ${esc(p.pkg)}${r.bin?` · <span class="bin">${esc(r.bin)}</span>`:""}</span>
+    </button>
+    <div class="ctrl">
+      <button class="step" data-d="-1" data-id="${p.id}" aria-label="Remove one">−</button>
+      <span class="qty st-${s}" title="${s==="low"?"At or below low-stock level ("+(r.min??DEFAULT_MIN)+")":""}">${label}</span>
+      <button class="step" data-d="1" data-id="${p.id}" aria-label="Add one">+</button>
+    </div></div>`;
+}
+function renderList(){
+  const f=filtered(); const shown=f.slice(0,state.limit);
+  $("count").textContent=`${f.length} part${f.length===1?"":"s"}`+(state.q?` matching “${state.q}”`:"")+(f.length>shown.length?` · showing ${shown.length}`:"");
+  $("list").innerHTML=shown.length?shown.map(rowHTML).join(""):`<div class="empty">No parts match. Try another search, or use <b>Add part</b> to add it to your catalog.</div>`;
+  $("moreBox").hidden=f.length<=shown.length;
+}
+function renderAll(){renderStats();renderCats();renderList(); if(!$("viewChk").hidden){quickCheck()}}
+
+// ---------- Persistence ----------
+const timers={}, writing={}, pending={};
+function payload(id){const r=rec(id);const o={qty:r.qty,min:r.min??DEFAULT_MIN,bin:r.bin||"",updatedAt:new Date().toISOString()}; if(custom[id]) Object.assign(o,custom[id],{custom:true}); return o}
+function save(id,delay=700){
+  if(local){saveLocal();setSync("Saved on this device only");return}
+  if(!col) return;
+  clearTimeout(timers[id]); timers[id]=setTimeout(()=>flush(id),delay);
+}
+async function flush(id){
+  if(writing[id]){pending[id]=true;return}
+  writing[id]=true;
+  try{ await col.doc(id).set(payload(id)); setSync("Saved") }
+  catch(e){ handleErr(e) }
+  writing[id]=false;
+  if(pending[id]){pending[id]=false;flush(id)}
+}
+async function remove(id){
+  delete stock[id]; delete custom[id];
+  if(local){saveLocal();return}
+  try{ await col.doc(id).delete() }catch(e){handleErr(e)}
+}
+function handleErr(e){
+  const c=e&&e.code||"";
+  if(c==="permission-denied"){readOnly=true;toast("Your account can view stock but not change it. Ask the admin.")}
+  else if(c==="resource-exhausted"){toast("Today's free Firebase limit is used up. Changes will save tomorrow.")}
+  else toast("Couldn't save. Check your connection and try again.");
+  setSync("Not saved");
+}
+function saveLocal(){try{localStorage.setItem("partsbin",JSON.stringify({stock,custom,customCats}))}catch(e){}}
+function loadLocal(){try{const d=JSON.parse(localStorage.getItem("partsbin")||"{}");Object.assign(stock,d.stock||{});Object.assign(custom,d.custom||{});Object.assign(customCats,d.customCats||{})}catch(e){}}
+function setSync(t){$("sync").textContent=t}
+function clearData(){[stock,custom,customCats].forEach(o=>{for(const k in o)delete o[k]})}
+
+// ---------- Firebase ----------
+let fs=null, auth=null, unsubs=[];
+function showLogin(){$("app").hidden=true;$("login").hidden=false;$("lEmail").focus()}
+function showApp(u){$("login").hidden=true;$("app").hidden=false;$("signOut").hidden=!u;if(u)$("signOut").title="Signed in as "+u.email}
+function stopSync(){unsubs.forEach(f=>f());unsubs=[];lastBackup=null;col=null;catCol=null;clearData();readOnly=false}
+function startSync(){
+  stopSync();
+  let timer=setTimeout(()=>setSync("Can't reach the server. Showing saved copy."),10000);
+  catCol=fs.collection("categories"); col=fs.collection("stock"); watchBackupMeta();
+  unsubs.push(catCol.onSnapshot(snap=>{for(const k in customCats)delete customCats[k];snap.docs.forEach(d=>{const v=d.data();if(v&&v.name)customCats[d.id]=v.name});renderAll();if(!$("catBg").hidden)renderCatList()},handleErr));
+  unsubs.push(col.onSnapshot({includeMetadataChanges:true},snap=>{
+    snap.docs.forEach(d=>{
+      if(timers[d.id]||writing[d.id]) return;
+      const v=d.data(); stock[d.id]={qty:+v.qty||0,min:v.min??DEFAULT_MIN,bin:v.bin||""};
+      if(v.custom) custom[d.id]={name:v.name,cat:v.cat,spec:v.spec||"",pkg:v.pkg||""};
+    });
+    snap.docChanges().forEach(ch=>{if(ch.type==="removed"){delete stock[ch.doc.id];delete custom[ch.doc.id]}});
+    if(!snap.metadata.fromCache){clearTimeout(timer);setSync(snap.metadata.hasPendingWrites?"Saving…":"Synced")}
+    else setSync(navigator.onLine?"Loading…":"Offline. Changes will sync later.");
+    renderAll();
+  },e=>{clearTimeout(timer);handleErr(e)}));
+}
+async function connect(){
+  const cfg=window.FIREBASE_CONFIG;
+  if(!window.firebase||!cfg||!cfg.apiKey||/PASTE/.test(cfg.apiKey)){
+    local=true; loadLocal(); showApp(null); $("signOut").hidden=true; watchBackupMeta();
+    setSync("Setup needed: add your Firebase settings. Saving on this device only."); renderAll(); return;
+  }
+  firebase.initializeApp(cfg);
+  fs=firebase.firestore(); auth=firebase.auth();
+  try{await fs.enablePersistence({synchronizeTabs:true})}catch(e){}
+  auth.onAuthStateChanged(u=>{ if(u){showApp(u);startSync()} else {stopSync();renderAll();showLogin()} });
+}
+$("loginForm").addEventListener("submit",async e=>{
+  e.preventDefault(); $("lErr").textContent=""; $("lBtn").disabled=true; $("lBtn").textContent="Signing in…";
+  try{ await auth.signInWithEmailAndPassword($("lEmail").value.trim(),$("lPass").value); $("lPass").value="" }
+  catch(err){ const c=err.code||"";
+    $("lErr").textContent=/invalid-credential|wrong-password|user-not-found|invalid-email/.test(c)?"Email or password is wrong.":c==="auth/too-many-requests"?"Too many tries. Wait a few minutes and try again.":c==="auth/network-request-failed"?"No internet connection.":"Couldn't sign in. "+(err.message||"") }
+  $("lBtn").disabled=false; $("lBtn").textContent="Sign in";
+});
+$("lReset").onclick=async()=>{const em=$("lEmail").value.trim(); if(!em){$("lErr").textContent="Type your email first, then tap Forgot password.";return}
+  try{await auth.sendPasswordResetEmail(em);$("lErr").textContent="Password reset email sent to "+em}catch(e){$("lErr").textContent="Couldn't send the reset email. Check the address."}};
+$("signOut").onclick=()=>{ if($("signOut").dataset.c!=="1"){$("signOut").dataset.c="1";$("signOut").textContent="Tap to confirm";setTimeout(()=>{$("signOut").dataset.c="";$("signOut").textContent="Sign out"},3000);return}
+  $("signOut").dataset.c="";$("signOut").textContent="Sign out"; auth.signOut() };
+
+// ---------- Backup ----------
+const isApp=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
+const BK_FOLDER="FitX Parts Backups", BK_DUE_DAYS=7;
+let lastBackup=null;
+function backupData(){
+  const out={app:"fitx-parts",version:1,exportedAt:new Date().toISOString(),stock:{},categories:{...customCats}};
+  for(const id in stock){ const o={...stock[id]}; if(custom[id]) Object.assign(o,custom[id],{custom:true}); out.stock[id]=o }
+  for(const id in custom){ if(!out.stock[id]) out.stock[id]={qty:0,min:DEFAULT_MIN,bin:"",...custom[id],custom:true} }
+  return out;
+}
+function backupName(){const d=new Date(),z=n=>String(n).padStart(2,"0");return `fitx-parts-backup-${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}.json`}
+function fmtWhen(iso){try{return new Date(iso).toLocaleString(undefined,{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}catch(e){return iso}}
+function renderBackupState(){
+  const btn=$("backupOpen"); if(!btn) return;
+  if(!lastBackup){ $("bkLast").textContent="No backup recorded yet. Back up once a week."; btn.textContent="Backup"; btn.classList.toggle("due",Object.keys(stock).length>0); return }
+  const days=Math.floor((Date.now()-new Date(lastBackup.at))/864e5);
+  $("bkLast").textContent=`Last backup: ${fmtWhen(lastBackup.at)} to ${lastBackup.where||"file"}${lastBackup.by?" by "+lastBackup.by:""}.`;
+  const due=days>=BK_DUE_DAYS; btn.classList.toggle("due",due); btn.textContent=due?`Backup (${days} days old)`:"Backup";
+}
+async function recordBackup(where,file){
+  lastBackup={at:new Date().toISOString(),where,file:file||"",by:auth&&auth.currentUser?auth.currentUser.email:""};
+  renderBackupState();
+  if(local){try{localStorage.setItem("partsbin-lastbackup",JSON.stringify(lastBackup))}catch(e){};return}
+  try{await fs.collection("meta").doc("backup").set(lastBackup)}catch(e){}
+}
+function watchBackupMeta(){
+  if(local){try{lastBackup=JSON.parse(localStorage.getItem("partsbin-lastbackup")||"null")}catch(e){};renderBackupState();return}
+  unsubs.push(fs.collection("meta").doc("backup").onSnapshot(d=>{lastBackup=d.exists?d.data():null;renderBackupState()},()=>{}));
+}
+
+// Restore (shared by file and Drive)
+async function restoreData(d){
+  if(readOnly){toast("Your account can view stock but not change it.");return false}
+  if(!d||d.app!=="fitx-parts"||!d.stock){toast("That isn't a FitX Parts backup.");return false}
+  const ents=Object.entries(d.stock), cats_=Object.entries(d.categories||{});
+  for(const [id,v] of ents){ stock[id]={qty:Math.max(0,+v.qty||0),min:v.min??DEFAULT_MIN,bin:v.bin||""}; if(v.custom) custom[id]={name:v.name,cat:v.cat,spec:v.spec||"",pkg:v.pkg||""} }
+  for(const [id,n] of cats_) customCats[id]=n;
+  try{
+    if(local){ saveLocal() }
+    else{
+      const now=new Date().toISOString(); const writes=ents.map(([id])=>["stock",id,{...payload(id),updatedAt:now}]).concat(cats_.map(([id,n])=>["categories",id,{name:n,createdAt:now}]));
+      for(let i=0;i<writes.length;i+=400){ const b=fs.batch(); writes.slice(i,i+400).forEach(([c,id,data])=>b.set(fs.collection(c).doc(id),data)); await b.commit() }
+    }
+    toast(`Restored ${ents.length} parts`); renderAll(); return true;
+  }catch(e){ handleErr(e); return false }
+}
+
+// Google Drive (website). Uses Google sign-in in the browser; the phone app shares instead.
+let gToken=null, gTokenExp=0, gClient=null;
+function loadGis(){return new Promise((res,rej)=>{ if(window.google&&google.accounts&&google.accounts.oauth2) return res();
+  const sc=document.createElement("script"); sc.src="https://accounts.google.com/gsi/client"; sc.async=true; sc.onload=()=>res(); sc.onerror=()=>rej(new Error("Couldn't load Google sign-in. Check the internet connection.")); document.head.appendChild(sc) })}
+async function driveToken(){
+  if(gToken&&Date.now()<gTokenExp-60000) return gToken;
+  const cid=window.GOOGLE_CLIENT_ID; if(!cid||/PASTE/.test(cid)) throw new Error("Google Drive isn't set up yet. Add the Google client ID to firebase-config.js.");
+  await loadGis();
+  return new Promise((res,rej)=>{
+    gClient=google.accounts.oauth2.initTokenClient({client_id:cid,scope:"https://www.googleapis.com/auth/drive.file",
+      callback:r=>{ if(r.error) return rej(new Error("Google sign-in was cancelled.")); gToken=r.access_token; gTokenExp=Date.now()+(+r.expires_in||3600)*1000; res(gToken) },
+      error_callback:()=>rej(new Error("Google sign-in was closed before finishing."))});
+    gClient.requestAccessToken({prompt:gToken?"":"consent"});
+  });
+}
+async function gfetch(url,opt={}){
+  const t=await driveToken(); const r=await fetch(url,{...opt,headers:{...(opt.headers||{}),Authorization:"Bearer "+t}});
+  if(r.status===401){gToken=null;throw new Error("Google sign-in expired. Tap again.")}
+  if(!r.ok) throw new Error("Google Drive said: "+r.status+" "+(await r.text()).slice(0,140));
+  return r;
+}
+async function driveFolder(){
+  const q=encodeURIComponent(`name='${BK_FOLDER}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  const j=await (await gfetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)&spaces=drive`)).json();
+  if(j.files&&j.files.length) return j.files[0].id;
+  const c=await (await gfetch("https://www.googleapis.com/drive/v3/files?fields=id",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:BK_FOLDER,mimeType:"application/vnd.google-apps.folder"})})).json();
+  return c.id;
+}
+async function busy(btn,label,fn){const old=btn.textContent;btn.disabled=true;btn.textContent=label;try{await fn()}catch(e){toast(e.message||String(e))}finally{btn.disabled=false;btn.textContent=old}}
+$("gdBackup").onclick=()=>busy($("gdBackup"),"Backing up…",async()=>{
+  const folder=await driveFolder(), name=backupName(), body=JSON.stringify(backupData());
+  const bd="fitxparts"+Date.now();
+  const multipart=`--${bd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({name,parents:[folder],mimeType:"application/json"})}\r\n--${bd}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${bd}--`;
+  await gfetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id",{method:"POST",headers:{"Content-Type":"multipart/related; boundary="+bd},body:multipart});
+  await recordBackup("Google Drive",name); toast("Backed up to Google Drive: "+name);
+});
+$("gdList").onclick=()=>busy($("gdList"),"Loading…",async()=>{
+  const folder=await driveFolder(); const q=encodeURIComponent(`'${folder}' in parents and trashed=false`);
+  const j=await (await gfetch(`https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=createdTime desc&pageSize=15&fields=files(id,name,createdTime,size)`)).json();
+  const f=j.files||[];
+  $("gdFiles").innerHTML=f.length?f.map(x=>`<div class="catitem"><span>${esc(fmtWhen(x.createdTime))}<span class="n"> · ${Math.max(1,Math.round((+x.size||0)/1024))} KB</span></span><button class="btn" data-gdrestore="${esc(x.id)}">Restore</button></div>`).join(""):`<div class="note">No backups in the ${BK_FOLDER} folder yet.</div>`;
+});
+$("gdFiles").addEventListener("click",e=>{
+  const b=e.target.closest("[data-gdrestore]"); if(!b) return;
+  if(b.dataset.c!=="1"){b.dataset.c="1";b.textContent="Tap again to restore";return}
+  busy(b,"Restoring…",async()=>{ const r=await gfetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(b.dataset.gdrestore)}?alt=media`); if(await restoreData(await r.json())) $("bkBg").hidden=true });
+});
+
+// Phone app: share the backup file (choose Drive in the share menu)
+$("shBackup").onclick=()=>busy($("shBackup"),"Preparing…",async()=>{
+  const P=window.Capacitor.Plugins, name=backupName();
+  await P.Filesystem.writeFile({path:name,data:JSON.stringify(backupData()),directory:"CACHE",encoding:"utf8"});
+  const {uri}=await P.Filesystem.getUri({path:name,directory:"CACHE"});
+  await P.Share.share({title:"FitX Parts backup",text:name,files:[uri],dialogTitle:"Save backup to Drive"});
+  await recordBackup("shared file (Drive)",name);
+});
+if(isApp){ $("gdWeb").hidden=true; $("gdApp").hidden=false; $("bkDownload").hidden=true }
+
+// File backup + restore
+let pendingImport=null;
+$("backupOpen").onclick=()=>{$("bkBg").hidden=false;renderBackupState()};
+$("bkClose").onclick=()=>{$("bkBg").hidden=true};
+$("bkBg").addEventListener("click",e=>{if(e.target.id==="bkBg")$("bkBg").hidden=true});
+$("bkDownload").onclick=()=>{
+  const name=backupName(), blob=new Blob([JSON.stringify(backupData(),null,1)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name;
+  document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
+  recordBackup("file",name); toast("Backup file saved: "+name);
+};
+$("bkCopy").onclick=async()=>{ try{await navigator.clipboard.writeText(JSON.stringify(backupData()));recordBackup("copied text");toast("Backup copied. Paste it into a note or email.")}catch(e){toast("Couldn't copy on this device. Use the other backup option.")} };
+$("bkFile").onchange=e=>{
+  const f=e.target.files[0]; pendingImport=null; $("bkImport").disabled=true; $("bkImport").textContent="Restore"; if(!f) return;
+  const r=new FileReader(); r.onload=()=>{ try{ const d=JSON.parse(r.result); if(d.app!=="fitx-parts"||!d.stock) throw 0;
+    pendingImport=d; $("bkImport").disabled=false; $("bkImport").textContent=`Restore ${Object.keys(d.stock).length} parts`; }
+    catch(_){ toast("That file isn't a FitX Parts backup.") } }; r.readAsText(f);
+};
+$("bkImport").onclick=async()=>{
+  if(!pendingImport) return; $("bkImport").disabled=true; $("bkImport").textContent="Restoring…";
+  if(await restoreData(pendingImport)) $("bkBg").hidden=true;
+  pendingImport=null; $("bkFile").value=""; $("bkImport").textContent="Restore";
+};
+
+// ---------- Interactions ----------
+function bump(id,d){
+  if(readOnly){toast("You can view this stock list but not change it.");return}
+  const r={...rec(id)}; r.qty=Math.max(0,(r.qty||0)+d); stock[id]=r; setSync("Saving…");
+  const row=document.querySelector(`.row[data-id="${CSS.escape(id)}"]`);
+  if(row){ const p=all().find(x=>x.id===id); row.outerHTML=rowHTML(p) }
+  renderStats(); save(id);
+}
+document.addEventListener("click",e=>{
+  const st=e.target.closest(".step"); if(st){bump(st.dataset.id,+st.dataset.d);return}
+  const ed=e.target.closest("[data-edit]"); if(ed){openSheet(ed.dataset.edit);return}
+  if(e.target.closest("#catOpen")){openCats();return}
+  const c=e.target.closest("[data-cat]"); if(c){state.cat=c.dataset.cat;state.limit=80;renderCats();renderList();return}
+  const s=e.target.closest("[data-st]"); if(s){state.st=s.dataset.st;state.limit=80;document.querySelectorAll("[data-st]").forEach(b=>b.setAttribute("aria-pressed",b===s));renderList();return}
+});
+let qT; $("q").addEventListener("input",e=>{clearTimeout(qT);qT=setTimeout(()=>{state.q=e.target.value.trim();state.limit=80;renderList()},120)});
+$("moreBtn").onclick=()=>{state.limit+=120;renderList()};
+function tab(chk){$("tabInv").setAttribute("aria-selected",!chk);$("tabChk").setAttribute("aria-selected",chk);$("viewInv").hidden=chk;$("viewChk").hidden=!chk; if(chk) runBom()}
+$("tabInv").onclick=()=>tab(false); $("tabChk").onclick=()=>tab(true);
+
+// Sheet
+let editing=null;
+function fillCatSelect(sel){$("fCat").innerHTML=cats().map(c=>`<option>${esc(c)}</option>`).join("")+`<option value="__new">+ New category…</option>`;$("fCat").value=sel;$("fNewCatBox").hidden=true;$("fNewCat").value=""}
+$("fCat").addEventListener("change",()=>{const n=$("fCat").value==="__new";$("fNewCatBox").hidden=!n;if(n)$("fNewCat").focus()});
+function openSheet(id){
+  if(readOnly){toast("You can view this stock list but not change it.");return}
+  editing=id; const isNew=!id; const p=id?all().find(x=>x.id===id):null; const r=id?rec(id):{qty:0,min:DEFAULT_MIN,bin:""};
+  const isCustom=isNew||p.custom;
+  $("shTitle").textContent=isNew?"Add a part":p.name;
+  $("shCustom").hidden=!isCustom;
+  $("shInfo").textContent=isCustom?"":`${p.cat} · ${p.spec} · ${p.pkg}`; $("shInfo").hidden=isCustom;
+  if(isCustom){$("fName").value=p?.name||"";fillCatSelect(p?.cat||(state.cat!=="All"?state.cat:"IC"));$("fPkg").value=p?.pkg||"";$("fSpec").value=p?.spec||""}
+  $("fQty").value=r.qty; $("fMin").value=r.min??DEFAULT_MIN; $("fBin").value=r.bin||"";
+  $("shDel").hidden=!(p&&p.custom);
+  $("sheetBg").hidden=false; (isCustom?$("fName"):$("fQty")).focus();
+}
+function closeSheet(){$("sheetBg").hidden=true;editing=null}
+$("addBtn").onclick=()=>openSheet(null);
+$("shCancel").onclick=closeSheet;
+$("sheetBg").addEventListener("click",e=>{if(e.target.id==="sheetBg")closeSheet()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("sheetBg").hidden)closeSheet();$("catBg").hidden=true;$("bkBg").hidden=true}});
+$("shSave").onclick=()=>{
+  let id=editing;
+  const isCustom=!id||custom[id];
+  if(isCustom){
+    const name=$("fName").value.trim(); if(!name){toast("Enter a part name.");$("fName").focus();return}
+    if(!id){ const exist=all().find(p=>norm(p.name)===norm(name)); if(exist){toast(`${exist.name} is already in the catalog. Opened it for you.`);openSheet(exist.id);return}
+      id="c-"+norm(name).replace(/[^a-z0-9.]/g,"").slice(0,40)+"-"+Math.random().toString(36).slice(2,6); }
+    let cat=$("fCat").value;
+    if(cat==="__new"){cat=$("fNewCat").value.trim();if(!cat){toast("Enter a category name.");$("fNewCat").focus();return}cat=addCategory(cat)}
+    custom[id]={name,cat,spec:$("fSpec").value.trim(),pkg:$("fPkg").value.trim()};
+  }
+  stock[id]={qty:Math.max(0,parseInt($("fQty").value)||0),min:Math.max(0,parseInt($("fMin").value)||0),bin:$("fBin").value.trim()};
+  closeSheet(); setSync("Saving…"); renderAll(); save(id,0); toast(isCustom&&!editing?"Part added":"Saved");
+};
+$("shDel").onclick=()=>{const id=editing; if(!id)return; if($("shDel").dataset.confirm!=="1"){$("shDel").dataset.confirm="1";$("shDel").textContent="Tap again to delete";return}
+  $("shDel").dataset.confirm="";$("shDel").textContent="Delete part"; closeSheet(); remove(id); renderAll(); toast("Part deleted")};
+
+// ---------- Availability ----------
+function findPart(q){
+  const n=norm(q); if(!n) return [];
+  const items=all();
+  const exact=items.filter(p=>norm(p.name)===n); if(exact.length) return exact;
+  const wo=items.filter(p=>norm(p.name).replace(/smd|network|film|tantalum/g,"")===n); if(wo.length) return wo;
+  const sw=items.filter(p=>norm(p.name).startsWith(n)); if(sw.length) return sw;
+  return items.filter(p=>norm(p.name+" "+p.spec).includes(n));
+}
+function quickCheck(){
+  const q=$("qc").value.trim(); const out=$("qcOut");
+  if(!q){out.className="note";out.textContent="Type a part to see how many you have and where they are.";return}
+  const m=findPart(q).slice(0,6);
+  if(!m.length){out.innerHTML=`<div class="verdict st-out">Not in your catalog. Add it from the Inventory tab.</div>`;return}
+  out.className=""; out.innerHTML=m.map(p=>{const r=rec(p.id),s=status(p.id);
+    return `<div class="row" style="border:1px solid var(--line);border-radius:8px;margin-bottom:6px"><div class="part"><span class="pname">${esc(p.name)}</span><span class="pmeta">${esc(p.spec)} · ${esc(p.pkg)}${r.bin?` · <span class="bin">${esc(r.bin)}</span>`:""}</span></div><span class="qty st-${s}">${s==="out"?"Out of stock":r.qty+" in stock"}</span></div>`}).join("");
+}
+let qcT; $("qc").addEventListener("input",()=>{clearTimeout(qcT);qcT=setTimeout(quickCheck,120)});
+function parseLine(line){
+  let s=line.trim(); if(!s) return null; let qty=1, m;
+  if((m=s.match(/^(\d+)\s*[x×*]\s*(.+)$/i))){qty=+m[1];s=m[2]}
+  else if((m=s.match(/^(.+?)[\s,;:\t]+[x×*]?\s*(\d+)\s*(pcs?)?$/i))){s=m[1];qty=+m[2]}
+  return {q:s.replace(/[,;]+$/,"").trim(),qty};
+}
+function runBom(){
+  const lines=$("bom").value.split(/\n/).map(parseLine).filter(Boolean);
+  if(!lines.length){$("bomOut").innerHTML="";return}
+  let ok=0;
+  const rows=lines.map(l=>{
+    const m=findPart(l.q); const p=m[0]; const have=p?rec(p.id).qty:0; const enough=p&&have>=l.qty; if(enough) ok++;
+    const st=!p?"out":enough?"in":have>0?"low":"out";
+    const label=!p?"Not in catalog":enough?"Available":have>0?`Short ${l.qty-have}`:"Out of stock";
+    return `<tr><td>${esc(l.q)}${p&&norm(p.name)!==norm(l.q)?`<div class="pmeta">matched ${esc(p.name)}${m.length>1?` (+${m.length-1} more)`:""}</div>`:""}${p&&rec(p.id).bin?`<div class="pmeta bin">${esc(rec(p.id).bin)}</div>`:""}</td><td class="num">${l.qty}</td><td class="num">${p?have:"—"}</td><td><span class="qty st-${st==="in"?"ok":st}">${label}</span></td></tr>`;
+  }).join("");
+  const all_=ok===lines.length;
+  $("bomOut").innerHTML=`<div class="verdict ${all_?"st-ok":"st-out"}">${all_?"Everything on this list is in stock.":`${lines.length-ok} of ${lines.length} lines can't be filled from stock.`}</div>
+  <div class="bom-wrap"><table class="bom-table"><thead><tr><th>Part</th><th style="text-align:right">Need</th><th style="text-align:right">Have</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+$("bomBtn").onclick=runBom;
+
+// ---------- Categories ----------
+function addCategory(name){
+  name=name.replace(/\s+/g," ").trim();
+  const ex=cats().find(c=>c.toLowerCase()===name.toLowerCase()); if(ex) return ex;
+  const id=catId(name); customCats[id]=name;
+  if(local) saveLocal(); else if(catCol) catCol.doc(id).set({name,createdAt:new Date().toISOString()}).catch(handleErr);
+  return name;
+}
+function renderCatList(){
+  const counts={}; all().forEach(p=>counts[p.cat]=(counts[p.cat]||0)+1);
+  const ids=Object.keys(customCats).sort((a,b)=>customCats[a].localeCompare(customCats[b]));
+  $("catList").innerHTML=ids.length?ids.map(id=>{const n=customCats[id],c=counts[n]||0;
+    return `<div class="catitem"><span>${esc(n)} <span class="n">${c} part${c===1?"":"s"}</span></span>${c?`<span class="n">In use</span>`:`<button class="btn danger" data-delcat="${id}">Delete</button>`}</div>`}).join(""):`<div class="note">No categories of your own yet. The ${CATS.length} built-in ones are always available.</div>`;
+}
+function openCats(){if(readOnly){toast("You can view this stock list but not change it.");return}renderCatList();$("catBg").hidden=false;$("catName").focus()}
+$("catAdd").onclick=()=>{const n=$("catName").value.trim();if(!n){toast("Enter a category name.");return}
+  const before=cats().length;const got=addCategory(n);$("catName").value="";renderAll();renderCatList();toast(cats().length>before?`Added “${got}”`:`“${got}” already exists`)};
+$("catName").addEventListener("keydown",e=>{if(e.key==="Enter")$("catAdd").click()});
+$("catClose").onclick=()=>$("catBg").hidden=true;
+$("catBg").addEventListener("click",e=>{if(e.target.id==="catBg")$("catBg").hidden=true;
+  const d=e.target.closest("[data-delcat]"); if(!d)return;
+  if(d.dataset.confirm!=="1"){d.dataset.confirm="1";d.textContent="Tap again";return}
+  const id=d.dataset.delcat,n=customCats[id];delete customCats[id];if(state.cat===n)state.cat="All";
+  if(local)saveLocal();else if(catCol)catCol.doc(id).delete().catch(handleErr);
+  renderAll();renderCatList();toast(`Deleted “${n}”`)});
+
+// toast
+let tT; function toast(t){const el=$("toast");el.textContent=t;el.hidden=false;clearTimeout(tT);tT=setTimeout(()=>el.hidden=true,2600)}
+
+renderAll(); connect();
+</script>
+</body>
+</html>
