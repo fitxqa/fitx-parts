@@ -158,7 +158,7 @@ h3{font:700 .95rem var(--display);letter-spacing:.04em;text-transform:uppercase;
   <div class="wrap">
     <div class="brand">
       <div class="logo" aria-label="FitX Sports Equipment Services"><span class="mark" aria-hidden="true">Fit<b>X</b></span><div class="logo-sub"><small>Sports Equipment Services</small><h1>Parts Bin Stock</h1></div></div>
-      <div class="hdr-actions"><span class="sync" id="sync">Connecting…</span><button class="linkbtn" id="installBtn" hidden>Install app</button><button class="linkbtn" id="backupOpen">Backup</button><button class="linkbtn" id="signOut" hidden>Sign out</button></div>
+      <div class="hdr-actions"><span class="sync" id="sync">Connecting…</span><span class="sync" id="verTag"></span><button class="linkbtn" id="installBtn" hidden>Install app</button><button class="linkbtn" id="backupOpen">Backup</button><button class="linkbtn" id="signOut" hidden>Sign out</button></div>
     </div>
     <div class="stats">
       <div class="stat"><b id="sTotal">0</b> parts in catalog</div>
@@ -913,7 +913,7 @@ setLocked(true);
   setTimeout(()=>{ if(!deferred&&!ios) btn.hidden=false },4000);
 })();
 
-const APP_VERSION="1.0.__BUILD__"; try{ $("appVer").textContent=/__/.test(APP_VERSION)?"development":APP_VERSION }catch(e){}
+const APP_VERSION="1.0.__BUILD__"; try{ const v=/__/.test(APP_VERSION)?"development":APP_VERSION; $("appVer").textContent=v; $("verTag").textContent="v"+v }catch(e){}
 // ---------- Phone app polish ----------
 function tick(){ try{ if(isApp) window.Capacitor.Plugins.Haptics.impact({style:"LIGHT"}) }catch(e){} }
 if(isApp){
