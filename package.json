@@ -10,7 +10,11 @@
     "@capacitor/android": "6.2.0",
     "@capacitor/core": "6.2.0",
     "@capacitor/filesystem": "6.0.4",
-    "@capacitor/share": "6.0.4"
+    "@capacitor/share": "6.0.4",
+    "@capacitor/app": "6.0.3",
+    "@capacitor/haptics": "6.0.3",
+    "@capacitor/status-bar": "6.0.3",
+    "@capacitor/splash-screen": "6.0.4"
   },
   "devDependencies": {
     "@capacitor/assets": "3.0.5",

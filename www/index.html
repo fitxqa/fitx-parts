@@ -6,9 +6,15 @@
 <meta name="theme-color" content="#ffffff">
 <link rel="icon" href="icon.png">
 <title>FitX Parts Bin</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Semi+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="preload" href="fonts/ibm-plex-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
 <style>
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:500;font-display:swap;src:url(fonts/ibm-plex-sans-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:600;font-display:swap;src:url(fonts/ibm-plex-sans-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:500;font-display:swap;src:url(fonts/ibm-plex-mono-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:600;font-display:swap;src:url(fonts/ibm-plex-mono-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"Saira Semi Condensed";font-style:normal;font-weight:600;font-display:swap;src:url(fonts/saira-semi-condensed-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"Saira Semi Condensed";font-style:normal;font-weight:700;font-display:swap;src:url(fonts/saira-semi-condensed-latin-700-normal.woff2) format("woff2")}
 /* FitX brand, light: white ground, black "Fit" + orange "X", orange rules. Layout: sticky header with stock summary, two tabs (Inventory list, Availability check), bottom sheet for editing one part. Solder-mask green + copper on a cool board-grey. */
 :root{
   --bg:#f6f6f6; --surface:#ffffff; --sunk:#f1f1f1; --ink:#141414; --muted:#666666; --line:#e3e3e3;
@@ -20,6 +26,18 @@
   color-scheme:light;
 }
 *{box-sizing:border-box}
+html{overscroll-behavior-y:none;-webkit-text-size-adjust:100%}
+button,.chip,.tab,.step{touch-action:manipulation;-webkit-user-select:none;user-select:none}
+.step:active,.btn:active,.chip:active{transform:scale(.94)}
+.step,.btn,.chip{transition:transform .08s ease-out,background .15s}
+.row{content-visibility:auto;contain-intrinsic-size:auto 64px}
+.chips{scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+@media (prefers-reduced-motion:no-preference){
+  .sheet-bg:not([hidden]){animation:fadeIn .15s ease-out}
+  .sheet-bg:not([hidden]) .sheet{animation:slideUp .22s cubic-bezier(.2,.8,.2,1)}
+  @keyframes fadeIn{from{opacity:0}}
+  @keyframes slideUp{from{transform:translateY(40px);opacity:.4}}
+}
 html,body{margin:0}
 [hidden]{display:none!important}
 img{max-width:100%}
@@ -157,7 +175,7 @@ h3{font:700 .95rem var(--display);letter-spacing:.04em;text-transform:uppercase;
     </div>
     <div class="note" id="count"></div>
     <div class="list" id="list"></div>
-    <div class="more" id="moreBox" hidden><button class="btn" id="moreBtn">Show more</button></div>
+    <div class="more" id="moreBox" hidden><span class="note">Loading more…</span></div>
   </div>
 
   <div class="wrap" id="viewChk" hidden>
@@ -561,6 +579,7 @@ $("bkImport").onclick=async()=>{
 
 // ---------- Interactions ----------
 function bump(id,d){
+  tick();
   if(readOnly){toast("You can view this stock list but not change it.");return}
   const r={...rec(id)}; r.qty=Math.max(0,(r.qty||0)+d); stock[id]=r; setSync("Saving…");
   const row=document.querySelector(`.row[data-id="${CSS.escape(id)}"]`);
@@ -575,7 +594,10 @@ document.addEventListener("click",e=>{
   const s=e.target.closest("[data-st]"); if(s){state.st=s.dataset.st;state.limit=80;document.querySelectorAll("[data-st]").forEach(b=>b.setAttribute("aria-pressed",b===s));renderList();return}
 });
 let qT; $("q").addEventListener("input",e=>{clearTimeout(qT);qT=setTimeout(()=>{state.q=e.target.value.trim();state.limit=80;renderList()},120)});
-$("moreBtn").onclick=()=>{state.limit+=120;renderList()};
+// Load more rows as you scroll near the end of the list
+if("IntersectionObserver" in window){
+  new IntersectionObserver(es=>{ if(es.some(e=>e.isIntersecting)&&!$("moreBox").hidden){ state.limit+=80; renderList() } },{rootMargin:"600px"}).observe($("moreBox"));
+}
 function tab(chk){$("tabInv").setAttribute("aria-selected",!chk);$("tabChk").setAttribute("aria-selected",chk);$("viewInv").hidden=chk;$("viewChk").hidden=!chk; if(chk) runBom()}
 $("tabInv").onclick=()=>tab(false); $("tabChk").onclick=()=>tab(true);
 
@@ -686,7 +708,22 @@ $("catBg").addEventListener("click",e=>{if(e.target.id==="catBg")$("catBg").hidd
 // toast
 let tT; function toast(t){const el=$("toast");el.textContent=t;el.hidden=false;clearTimeout(tT);tT=setTimeout(()=>el.hidden=true,2600)}
 
+// ---------- Phone app polish ----------
+function tick(){ try{ if(isApp) window.Capacitor.Plugins.Haptics.impact({style:"LIGHT"}) }catch(e){} }
+if(isApp){
+  const P=window.Capacitor.Plugins;
+  try{ P.StatusBar.setOverlaysWebView({overlay:false}); P.StatusBar.setBackgroundColor({color:"#ffffff"}); P.StatusBar.setStyle({style:"LIGHT"}) }catch(e){}
+  try{ P.App.addListener("backButton",()=>{
+    if(!$("sheetBg").hidden){closeSheet();return}
+    if(!$("catBg").hidden){$("catBg").hidden=true;return}
+    if(!$("bkBg").hidden){$("bkBg").hidden=true;return}
+    if(!$("viewChk").hidden){tab(false);return}
+    if($("q").value){$("q").value="";state.q="";renderList();return}
+    P.App.minimizeApp();
+  }) }catch(e){}
+}
 renderAll(); connect();
+if(isApp){ requestAnimationFrame(()=>{ try{ window.Capacitor.Plugins.SplashScreen.hide({fadeOutDuration:200}) }catch(e){} }) }
 </script>
 </body>
 </html>

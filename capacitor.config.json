@@ -4,5 +4,18 @@
   "webDir": "www",
   "android": {
     "backgroundColor": "#ffffff"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 400,
+      "launchAutoHide": true,
+      "backgroundColor": "#ffffff",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "backgroundColor": "#ffffff",
+      "style": "LIGHT",
+      "overlaysWebView": false
+    }
   }
 }
