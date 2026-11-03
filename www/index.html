@@ -137,6 +137,8 @@ h2{font:700 1.15rem var(--display);margin:0;letter-spacing:.01em}
 h3{font:700 .95rem var(--display);letter-spacing:.04em;text-transform:uppercase;margin:0}
 .actions.start{justify-content:flex-start}
 .linkbtn.due{color:var(--bad)}
+.loadcard{border:2px solid var(--accent);background:var(--icon-bg);border-radius:10px;padding:12px 14px;display:grid;gap:8px}
+.loadcard b{color:var(--ink)}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:.88rem;z-index:30;max-width:calc(100% - 32px)}
 @media (prefers-reduced-motion:no-preference){.qty{transition:background .2s,color .2s}}
 </style>
@@ -175,6 +177,10 @@ h3{font:700 .95rem var(--display);letter-spacing:.04em;text-transform:uppercase;
 
 <main>
   <div class="wrap" id="viewInv">
+    <div class="loadcard" id="loadCard" hidden>
+      <div><b>Capacitor stock list from 3 Nov</b><div class="note">25 electrolytic capacitors, 166 pieces. Tap once to put them into stock for everyone.</div></div>
+      <div class="actions start"><button class="btn primary" id="loadGo">Add to stock</button><button class="btn" id="loadLater">Not now</button></div>
+    </div>
     <div class="toolbar">
       <div class="search">
         <input type="search" id="q" placeholder="Search part, value or package (e.g. 10k, LM358, SOT-23)" aria-label="Search parts">
@@ -569,7 +575,7 @@ function stopSync(){unsubs.forEach(f=>f());unsubs=[];lastBackup=null;col=null;ca
 function startSync(){
   stopSync();
   let timer=setTimeout(()=>setSync("Can't reach the server. Showing saved copy."),10000);
-  catCol=fs.collection("categories"); col=fs.collection("stock"); watchBackupMeta();
+  catCol=fs.collection("categories"); col=fs.collection("stock"); watchBackupMeta(); watchLoads();
   unsubs.push(catCol.onSnapshot(snap=>{for(const k in customCats)delete customCats[k];snap.docs.forEach(d=>{const v=d.data();if(v&&v.name)customCats[d.id]=v.name});renderAll();if(!$("catBg").hidden)renderCatList()},handleErr));
   unsubs.push(col.onSnapshot({includeMetadataChanges:true},snap=>{
     snap.docs.forEach(d=>{
@@ -586,7 +592,7 @@ function startSync(){
 async function connect(){
   const cfg=window.FIREBASE_CONFIG;
   if(!window.firebase||!cfg||!cfg.apiKey||/PASTE/.test(cfg.apiKey)){
-    local=true; loadLocal(); showApp(null); $("signOut").hidden=true; watchBackupMeta();
+    local=true; loadLocal(); showApp(null); $("signOut").hidden=true; watchBackupMeta(); setTimeout(watchLoads,0);
     setSync("Setup needed: add your Firebase settings. Saving on this device only."); renderAll(); return;
   }
   firebase.initializeApp(cfg);
@@ -866,6 +872,30 @@ $("catBg").addEventListener("click",e=>{if(e.target.id==="catBg")$("catBg").hidd
 
 // toast
 let tT; function toast(t){const el=$("toast");el.textContent=t;el.hidden=false;clearTimeout(tT);tT=setTimeout(()=>el.hidden=true,2600)}
+
+// ---------- Stock lists to load (one-time) ----------
+const PENDING_LOADS=[{id:"cap-2026-11-03",title:"Capacitor stock list from 3 Nov",stock:{"capacitor-100uf": {"qty": 4, "min": 5, "bin": ""}, "capacitor-68uf-25v": {"qty": 8, "min": 5, "bin": ""}, "capacitor-100uf-35v": {"qty": 22, "min": 5, "bin": ""}, "capacitor-220uf": {"qty": 11, "min": 5, "bin": ""}, "capacitor-47uf-10v": {"qty": 1, "min": 5, "bin": ""}, "capacitor-1000uf": {"qty": 19, "min": 5, "bin": ""}, "capacitor-330uf-25v": {"qty": 16, "min": 5, "bin": ""}, "capacitor-470uf-50v": {"qty": 2, "min": 5, "bin": ""}, "capacitor-470uf": {"qty": 17, "min": 5, "bin": ""}, "capacitor-1000uf-35v": {"qty": 7, "min": 5, "bin": ""}, "capacitor-470uf-10v": {"qty": 27, "min": 5, "bin": ""}, "capacitor-47uf-400v": {"qty": 1, "min": 5, "bin": ""}, "capacitor-1000uf-25v": {"qty": 3, "min": 5, "bin": ""}, "capacitor-33uf-35v": {"qty": 2, "min": 5, "bin": ""}, "capacitor-1uf-electrolytic-50v": {"qty": 1, "min": 5, "bin": ""}, "capacitor-22uf": {"qty": 2, "min": 5, "bin": ""}, "capacitor-100uf-16v": {"qty": 2, "min": 5, "bin": ""}, "capacitor-47uf-63v": {"qty": 1, "min": 5, "bin": ""}, "capacitor-47uf-16v": {"qty": 1, "min": 5, "bin": ""}, "capacitor-47uf": {"qty": 1, "min": 5, "bin": ""}, "capacitor-42uf-400v": {"qty": 1, "min": 5, "bin": ""}, "capacitor-100uf-50v": {"qty": 4, "min": 5, "bin": ""}, "capacitor-330uf-10v": {"qty": 11, "min": 5, "bin": ""}, "capacitor-100uf-400v": {"qty": 1, "min": 5, "bin": ""}, "capacitor-150uf-250v": {"qty": 1, "min": 5, "bin": ""}}}];
+let loadDone={}, loadChecked=false;
+function checkLoads(){
+  const pend=PENDING_LOADS.filter(l=>!loadDone[l.id]);
+  let later=false; try{later=sessionStorage.getItem("loadLater")==="1"}catch(e){}
+  $("loadCard").hidden=!(loadChecked&&pend.length&&!later&&!readOnly);
+}
+function watchLoads(){
+  if(local){ try{loadDone=JSON.parse(localStorage.getItem("partsbin-loads")||"{}")}catch(e){}; loadChecked=true; checkLoads(); return }
+  unsubs.push(fs.collection("meta").doc("loads").onSnapshot(d=>{ if(d.metadata.fromCache&&!d.exists) return; loadDone=d.exists?d.data():{}; loadChecked=true; checkLoads() },()=>{}));
+}
+$("loadLater").onclick=()=>{ try{sessionStorage.setItem("loadLater","1")}catch(e){}; $("loadCard").hidden=true };
+$("loadGo").onclick=()=>busy($("loadGo"),"Adding…",async()=>{
+  const L=PENDING_LOADS.find(l=>!loadDone[l.id]); if(!L) return;
+  const ok=await restoreData({app:"fitx-parts",stock:L.stock,categories:{}}); if(!ok) return;
+  loadDone[L.id]=new Date().toISOString();
+  if(local){ try{localStorage.setItem("partsbin-loads",JSON.stringify(loadDone))}catch(e){} }
+  else await fs.collection("meta").doc("loads").set(loadDone,{merge:true});
+  state.cat="Capacitor"; state.st="in"; state.q=""; $("q").value="";
+  document.querySelectorAll("[data-st]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.st==="in"));
+  renderAll(); checkLoads(); toast("Added 25 capacitors (166 pieces). Showing Capacitor, In stock.");
+});
 
 // ---------- Count lock ----------
 // + and − are hidden while locked, so a stray tap can't change a count.
