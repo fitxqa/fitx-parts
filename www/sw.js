@@ -1,7 +1,7 @@
 // FitX Parts — offline support for the installed website.
 // Page and settings: network first (so updates arrive), cached copy when offline.
 // Fonts, Firebase SDK and icons: cache first.
-const CACHE = "fitx-parts-v1";
+const CACHE = "fitx-parts-__BUILD__";
 const CORE = [
   "./", "index.html", "firebase-config.js", "manifest.webmanifest",
   "vendor/firebase-app-compat.js", "vendor/firebase-auth-compat.js", "vendor/firebase-firestore-compat.js",
@@ -31,7 +31,7 @@ self.addEventListener("fetch", e => {
   const networkFirst = req.mode === "navigate" || /\/(index\.html|firebase-config\.js|manifest\.webmanifest)?$/.test(url.pathname) || url.pathname.endsWith("firebase-config.js");
   if (networkFirst) {
     e.respondWith(
-      fetch(req).then(res => {
+      fetch(req, { cache: "no-store" }).then(res => {
         const copy = res.clone();
         caches.open(CACHE).then(c => c.put(req, copy));
         return res;

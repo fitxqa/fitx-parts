@@ -23,6 +23,9 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - name: Stamp version
+        run: sed -i "s/__BUILD__/${{ github.run_number }}/g" www/index.html www/sw.js
+
       - name: Install Capacitor
         run: npm install
 

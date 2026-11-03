@@ -252,6 +252,7 @@ LED 5mm red, 2
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="bkTitle">
     <h2 id="bkTitle">Backup</h2>
     <div class="note" id="bkLast">No backup recorded yet.</div>
+    <div class="note">App version <b id="appVer"></b></div>
     <section id="gdWeb" class="bk-sec">
       <h3>Google Drive</h3>
       <div class="note">Saves to the <b>FitX Parts Backups</b> folder in the Google account you choose.</div>
@@ -881,7 +882,9 @@ setLocked(true);
 (function(){
   if(isApp) return;
   const standalone=window.matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
-  if("serviceWorker" in navigator && location.protocol==="https:"){ navigator.serviceWorker.register("sw.js").catch(()=>{}) }
+  if("serviceWorker" in navigator && location.protocol==="https:"){ navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(r=>{ r.update(); setInterval(()=>r.update(),30*60*1000) }).catch(()=>{});
+    let reloaded=false; const hadController=!!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener("controllerchange",()=>{ if(hadController&&!reloaded){ reloaded=true; location.reload() } }); }
   if(standalone) return;
   const ua=navigator.userAgent, ios=/iPhone|iPad|iPod/.test(ua)||(/Macintosh/.test(ua)&&"ontouchend" in document);
   let deferred=null; const btn=$("installBtn");
@@ -903,6 +906,7 @@ setLocked(true);
   setTimeout(()=>{ if(!deferred&&!ios) btn.hidden=false },4000);
 })();
 
+const APP_VERSION="1.0.__BUILD__"; try{ $("appVer").textContent=/__/.test(APP_VERSION)?"development":APP_VERSION }catch(e){}
 // ---------- Phone app polish ----------
 function tick(){ try{ if(isApp) window.Capacitor.Plugins.Haptics.impact({style:"LIGHT"}) }catch(e){} }
 if(isApp){
