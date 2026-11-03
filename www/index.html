@@ -80,7 +80,12 @@ textarea{font-family:var(--mono);font-size:.9rem;min-height:150px;resize:vertica
 .catlist{display:grid;gap:6px}
 .catitem{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:8px}
 .catitem .n{font-family:var(--mono);color:var(--muted);font-size:.82rem}
-.status-row{display:flex;gap:6px;flex-wrap:wrap}
+.status-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.lock{margin-left:auto;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:.82rem;font-weight:600;color:var(--muted)}
+.lock svg{width:14px;height:14px}
+.lock.open{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+body.locked .step{display:none}
+body.locked .ctrl{padding-right:2px}
 .note{font-size:.85rem;color:var(--muted)}
 .list{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 12px;border-top:1px solid var(--line)}
@@ -171,6 +176,7 @@ h3{font:700 .95rem var(--display);letter-spacing:.04em;text-transform:uppercase;
         <button class="chip" data-st="in" aria-pressed="false">In stock</button>
         <button class="chip" data-st="low" aria-pressed="false">Low</button>
         <button class="chip" data-st="out" aria-pressed="false">Out of stock</button>
+        <button class="lock" id="lockBtn" aria-pressed="false"></button>
       </div>
     </div>
     <div class="note" id="count"></div>
@@ -579,7 +585,8 @@ $("bkImport").onclick=async()=>{
 
 // ---------- Interactions ----------
 function bump(id,d){
-  tick();
+  if(qtyLocked){toast("Counts are locked. Tap Unlock to change them.");return}
+  tick(); armRelock();
   if(readOnly){toast("You can view this stock list but not change it.");return}
   const r={...rec(id)}; r.qty=Math.max(0,(r.qty||0)+d); stock[id]=r; setSync("Saving…");
   const row=document.querySelector(`.row[data-id="${CSS.escape(id)}"]`);
@@ -707,6 +714,24 @@ $("catBg").addEventListener("click",e=>{if(e.target.id==="catBg")$("catBg").hidd
 
 // toast
 let tT; function toast(t){const el=$("toast");el.textContent=t;el.hidden=false;clearTimeout(tT);tT=setTimeout(()=>el.hidden=true,2600)}
+
+// ---------- Count lock ----------
+// + and − are hidden while locked, so a stray tap can't change a count.
+// Unlocking lasts until 60 s after the last change, then it locks again.
+const LOCK_IDLE_MS=60000;
+const ICON_LOCK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+const ICON_OPEN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/></svg>';
+let qtyLocked=true, relockT=null;
+function setLocked(v){
+  qtyLocked=v; document.body.classList.toggle("locked",v); clearTimeout(relockT);
+  const b=$("lockBtn"); b.classList.toggle("open",!v); b.setAttribute("aria-pressed",String(!v));
+  b.innerHTML=v?ICON_LOCK+"Unlock + / −":ICON_OPEN+"Done";
+  if(!v) armRelock();
+}
+function armRelock(){ clearTimeout(relockT); relockT=setTimeout(()=>{ if(!qtyLocked){ setLocked(true); toast("Counts locked again") } },LOCK_IDLE_MS) }
+$("lockBtn").onclick=()=>{ setLocked(!qtyLocked); if(!qtyLocked) toast("+ and − unlocked. They lock again after 1 minute without changes.") };
+document.addEventListener("visibilitychange",()=>{ if(document.hidden&&!qtyLocked) setLocked(true) });
+setLocked(true);
 
 // ---------- Phone app polish ----------
 function tick(){ try{ if(isApp) window.Capacitor.Plugins.Haptics.impact({style:"LIGHT"}) }catch(e){} }
