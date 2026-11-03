@@ -139,6 +139,16 @@ h3{font:700 .95rem var(--display);letter-spacing:.04em;text-transform:uppercase;
 .linkbtn.due{color:var(--bad)}
 .loadcard{border:2px solid var(--accent);background:var(--icon-bg);border-radius:10px;padding:12px 14px;display:grid;gap:8px}
 .loadcard b{color:var(--ink)}
+.fab{position:fixed;right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:15;display:inline-flex;align-items:center;gap:6px;background:var(--surface);color:var(--accent);border:1.5px solid var(--accent);border-radius:999px;padding:8px 14px;font-weight:600;font-size:.85rem;box-shadow:0 4px 14px rgba(0,0,0,.12)}
+.fab svg{width:16px;height:16px}
+main .wrap{padding-bottom:84px}
+.imp-table{width:100%;border-collapse:collapse;font-size:.86rem}
+.imp-table td,.imp-table th{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.imp-table th{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.imp-table td.num{font-family:var(--mono);text-align:right;white-space:nowrap}
+.imp-wrap{max-height:45vh;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.tag{display:inline-block;font-size:.7rem;font-weight:600;padding:1px 6px;border-radius:6px}
+.tag.new{background:var(--warn-bg);color:var(--warn)} .tag.err{background:var(--bad-bg);color:var(--bad)}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:.88rem;z-index:30;max-width:calc(100% - 32px)}
 @media (prefers-reduced-motion:no-preference){.qty{transition:background .2s,color .2s}}
 </style>
@@ -160,7 +170,7 @@ h3{font:700 .95rem var(--display);letter-spacing:.04em;text-transform:uppercase;
   <div class="wrap">
     <div class="brand">
       <div class="logo" aria-label="FitX Sports Equipment Services"><span class="mark" aria-hidden="true">Fit<b>X</b></span><div class="logo-sub"><small>Sports Equipment Services</small><h1>Parts Bin Stock</h1></div></div>
-      <div class="hdr-actions"><span class="sync" id="sync">Connecting…</span><span class="sync" id="verTag"></span><button class="linkbtn" id="installBtn" hidden>Install app</button><button class="linkbtn" id="backupOpen">Backup</button><button class="linkbtn" id="signOut" hidden>Sign out</button></div>
+      <div class="hdr-actions"><span class="sync" id="sync">Connecting…</span><span class="sync" id="verTag"></span><button class="linkbtn" id="installBtn" hidden>Install app</button><button class="linkbtn" id="importOpen">Import</button><button class="linkbtn" id="backupOpen">Backup</button><button class="linkbtn" id="signOut" hidden>Sign out</button></div>
     </div>
     <div class="stats">
       <div class="stat"><b id="sTotal">0</b> parts in catalog</div>
@@ -289,6 +299,17 @@ LED 5mm red, 2
     <h2 id="insTitle">Install FitX Parts</h2>
     <div class="note" id="insText"></div>
     <div class="actions"><button class="btn primary" id="insClose">OK</button></div>
+  </div>
+</div>
+<button class="fab" id="sampleBtn" title="Download the sample Excel file for importing stock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></svg>Sample Excel</button>
+<div class="sheet-bg" id="impBg" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="impTitle">
+    <h2 id="impTitle">Import stock from Excel</h2>
+    <div class="note">Use the sample file: one part per row with <b>Part name</b> and <b>Quantity</b>. <b>Action</b> Add adds to the current count; Set replaces it.</div>
+    <div class="actions start"><button class="btn" id="impSample">Download sample Excel</button></div>
+    <input type="file" id="impFile" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" aria-label="Excel file">
+    <div id="impOut"></div>
+    <div class="actions"><button class="btn" id="impClose">Close</button><button class="btn primary" id="impGo" hidden>Add to stock</button></div>
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
@@ -872,6 +893,99 @@ $("catBg").addEventListener("click",e=>{if(e.target.id==="catBg")$("catBg").hidd
 
 // toast
 let tT; function toast(t){const el=$("toast");el.textContent=t;el.hidden=false;clearTimeout(tT);tT=setTimeout(()=>el.hidden=true,2600)}
+
+// ---------- Excel import + sample file ----------
+const SAMPLE_FILE="fitx-parts-import-sample.xlsx";
+async function saveFile(name,blob){
+  if(isApp){
+    const P=window.Capacitor.Plugins;
+    const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(",")[1]);r.onerror=rej;r.readAsDataURL(blob)});
+    await P.Filesystem.writeFile({path:name,data:b64,directory:"CACHE"});
+    const {uri}=await P.Filesystem.getUri({path:name,directory:"CACHE"});
+    await P.Share.share({title:name,files:[uri],dialogTitle:"Save "+name});
+    return;
+  }
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);
+}
+async function downloadSample(btn){
+  await busy(btn,"Preparing…",async()=>{ const r=await fetch(SAMPLE_FILE,{cache:"no-store"}); if(!r.ok) throw new Error("Couldn't get the sample file. Check the internet connection."); await saveFile(SAMPLE_FILE,await r.blob()); if(!isApp) toast("Sample Excel downloaded") });
+}
+$("sampleBtn").onclick=()=>downloadSample($("sampleBtn"));
+$("impSample").onclick=()=>downloadSample($("impSample"));
+function loadXlsx(){return new Promise((res,rej)=>{ if(window.XLSX) return res(); const sc=document.createElement("script"); sc.src="vendor/xlsx.full.min.js"; sc.onload=()=>res(); sc.onerror=()=>rej(new Error("Couldn't load the Excel reader. Check the internet connection.")); document.head.appendChild(sc) })}
+function tokenKey(x){return String(x).toLowerCase().replace(/µ/g,"u").replace(/(\d)\s+(uf|nf|pf|mf|f|v|vac|vdc|k|kΩ|m|mh|uh|a|ma|w|mhz|khz|hz|r|ω|Ω|ohms?)\b/gi,"$1$2").replace(/[ΩωΩ]/g," ").replace(/\bohms?\b/g," ").replace(/([a-z])(\d)/g,"$1 $2").replace(/(\d)([a-z]{2,})/g,"$1$2").replace(/\.(?!\d)/g," ").split(/[\s,;:\/_()\-]+/).filter(Boolean).sort().join(" ")}
+let impPlan=null;
+function buildIndex(){const m=new Map(); all().forEach(p=>{[tokenKey(p.name),norm(p.name)].forEach(k=>{ if(!m.has(k)) m.set(k,[]); m.get(k).push(p) })}); return m}
+function findMatch(idx,name,cat){
+  for(const k of [tokenKey(name),norm(name)]){ const l=idx.get(k); if(l&&l.length){ return (cat&&l.find(p=>p.cat.toLowerCase()===cat.toLowerCase()))||l[0] } }
+  return null;
+}
+function parseRows(rows){
+  const H={name:/^(part ?name|name|part|component|item|description of part)$/,cat:/categ/,qty:/^(qty|quantity|pcs|pieces|count|stock|qty to add)/,action:/^(action|mode)/,min:/(low|min)/,bin:/(bin|location|drawer|shelf)/,desc:/^(desc|spec)/,pkg:/^(package|pkg)/};
+  let hr=-1, col={};
+  for(let r=0;r<Math.min(rows.length,15)&&hr<0;r++){ const row=rows[r].map(c=>String(c).trim().toLowerCase()); const ni=row.findIndex(c=>H.name.test(c)); if(ni>=0){ hr=r; row.forEach((c,i)=>{ for(const k in H) if(col[k]===undefined&&H[k].test(c)) col[k]=i }) } }
+  if(hr<0){ hr=-1; col={name:0,qty:1} }
+  const out=[];
+  for(let r=hr+1;r<rows.length;r++){ const row=rows[r], g=k=>col[k]===undefined?"":String(row[col[k]]??"").trim();
+    const name=g("name"); if(!name) continue;
+    out.push({line:r+1,name,cat:g("cat"),qty:g("qty"),action:g("action").toLowerCase(),min:g("min"),bin:g("bin"),desc:g("desc"),pkg:g("pkg")}) }
+  return out;
+}
+function planImport(items){
+  const idx=buildIndex(), byId=new Map(), errors=[], catsNow=new Set(cats().map(c=>c.toLowerCase()));
+  for(const it of items){
+    const qs=String(it.qty).replace(/[^\d.\-]/g,""); const q=qs===""?NaN:Number(qs);
+    if(!Number.isFinite(q)||q<0||Math.floor(q)!==q){ errors.push(`Row ${it.line}: “${it.name}” has no valid quantity (${it.qty||"empty"})`); continue }
+    const set=/^set|^replace/.test(it.action);
+    let p=findMatch(idx,it.name,it.cat), key, isNew=false;
+    if(p) key=p.id; else { isNew=true; key="new:"+(it.cat||"").toLowerCase()+":"+tokenKey(it.name) }
+    let e=byId.get(key);
+    if(!e){ e={key,part:p,isNew,name:p?p.name:it.name,cat:p?p.cat:(it.cat||"IC"),catIsNew:!p&&it.cat&&!catsNow.has(it.cat.toLowerCase()),add:0,set:null,min:"",bin:"",desc:it.desc,pkg:it.pkg,rows:[]}; byId.set(key,e) }
+    if(set) {e.set=q;e.add=0} else e.add+=q;
+    if(it.min!==""&&Number.isFinite(+it.min)) e.min=Math.max(0,Math.floor(+it.min));
+    if(it.bin) e.bin=it.bin;
+    e.rows.push(it.line);
+  }
+  const lines=[...byId.values()].map(e=>{ const cur=e.part?rec(e.part.id).qty||0:0; e.before=cur; e.after=e.set!==null?e.set+e.add:cur+e.add; return e });
+  return {lines,errors};
+}
+function renderPlan(){
+  const {lines,errors}=impPlan, nNew=lines.filter(l=>l.isNew).length, pcs=lines.reduce((a,l)=>a+(l.after-l.before),0);
+  $("impOut").innerHTML=`<div class="note"><b>${lines.length}</b> parts ready${nNew?`, <b>${nNew}</b> new`:""}${errors.length?`, <b style="color:var(--bad)">${errors.length} row${errors.length===1?"":"s"} skipped</b>`:""}. Change: ${pcs>=0?"+":""}${pcs} pieces.</div>`+
+   (errors.length?`<div class="note" style="color:var(--bad)">${errors.slice(0,8).map(esc).join("<br>")}${errors.length>8?"<br>…":""}</div>`:"")+
+   (lines.length?`<div class="imp-wrap"><table class="imp-table"><thead><tr><th>Part</th><th style="text-align:right">Now</th><th style="text-align:right">After</th></tr></thead><tbody>${lines.map(l=>`<tr><td>${esc(l.name)} ${l.isNew?`<span class="tag new">New in ${esc(l.cat)}${l.catIsNew?" (new category)":""}</span>`:`<span class="pmeta">${esc(l.cat)}</span>`}${l.bin?`<div class="pmeta bin">${esc(l.bin)}</div>`:""}</td><td class="num">${l.before}</td><td class="num"><b>${l.after}</b>${l.set!==null?" (set)":""}</td></tr>`).join("")}</tbody></table></div>`:"");
+  $("impGo").hidden=!lines.length; $("impGo").textContent=`Add to stock (${lines.length} parts)`;
+}
+$("importOpen").onclick=()=>{ if(readOnly){toast("Your account can view stock but not change it.");return} impPlan=null; $("impOut").innerHTML=""; $("impGo").hidden=true; $("impFile").value=""; $("impBg").hidden=false };
+$("impClose").onclick=()=>$("impBg").hidden=true;
+$("impBg").addEventListener("click",e=>{if(e.target.id==="impBg")$("impBg").hidden=true});
+$("impFile").onchange=async e=>{
+  const f=e.target.files[0]; if(!f) return; $("impOut").innerHTML='<div class="note">Reading file…</div>'; $("impGo").hidden=true;
+  try{
+    await loadXlsx();
+    const wb=XLSX.read(await f.arrayBuffer(),{type:"array"});
+    const sn=wb.SheetNames.find(n=>/stock import/i.test(n))||wb.SheetNames.find(n=>!/how to|example|categor/i.test(n))||wb.SheetNames[0];
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:"",raw:false});
+    const items=parseRows(rows);
+    if(!items.length){ $("impOut").innerHTML=`<div class="note" style="color:var(--bad)">No parts found on the sheet “${esc(sn)}”. Type parts under the headings Part name and Quantity.</div>`; return }
+    impPlan=planImport(items); renderPlan();
+  }catch(err){ $("impOut").innerHTML=`<div class="note" style="color:var(--bad)">Couldn't read this file. Save it as .xlsx or .csv and try again.</div>` }
+};
+$("impGo").onclick=()=>busy($("impGo"),"Adding…",async()=>{
+  if(!impPlan) return; const now=new Date().toISOString(), ids=[];
+  for(const l of impPlan.lines){
+    let id=l.part?l.part.id:null;
+    if(!id){ const cat=addCategory(l.cat); id="c-"+norm(l.name).replace(/[^a-z0-9.]/g,"").slice(0,40)+"-"+Math.random().toString(36).slice(2,6); custom[id]={name:l.name,cat,spec:l.desc||"",pkg:l.pkg||""} }
+    const r=rec(id); stock[id]={qty:l.after,min:l.min!==""?l.min:(r.min??DEFAULT_MIN),bin:l.bin||r.bin||""}; ids.push(id);
+  }
+  try{
+    if(local) saveLocal();
+    else for(let i=0;i<ids.length;i+=400){ const b=fs.batch(); ids.slice(i,i+400).forEach(id=>b.set(col.doc(id),{...payload(id),updatedAt:now})); await b.commit() }
+    $("impBg").hidden=true; renderAll(); toast(`Stock updated for ${ids.length} parts`); impPlan=null;
+  }catch(e){ handleErr(e) }
+});
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") $("impBg").hidden=true });
 
 // ---------- Stock lists to load (one-time) ----------
 const PENDING_LOADS=[{id:"cap-2026-11-03",title:"Capacitor stock list from 3 Nov",stock:{"capacitor-100uf": {"qty": 4, "min": 5, "bin": ""}, "capacitor-68uf-25v": {"qty": 8, "min": 5, "bin": ""}, "capacitor-100uf-35v": {"qty": 22, "min": 5, "bin": ""}, "capacitor-220uf": {"qty": 11, "min": 5, "bin": ""}, "capacitor-47uf-10v": {"qty": 1, "min": 5, "bin": ""}, "capacitor-1000uf": {"qty": 19, "min": 5, "bin": ""}, "capacitor-330uf-25v": {"qty": 16, "min": 5, "bin": ""}, "capacitor-470uf-50v": {"qty": 2, "min": 5, "bin": ""}, "capacitor-470uf": {"qty": 17, "min": 5, "bin": ""}, "capacitor-1000uf-35v": {"qty": 7, "min": 5, "bin": ""}, "capacitor-470uf-10v": {"qty": 27, "min": 5, "bin": ""}, "capacitor-47uf-400v": {"qty": 1, "min": 5, "bin": ""}, "capacitor-1000uf-25v": {"qty": 3, "min": 5, "bin": ""}, "capacitor-33uf-35v": {"qty": 2, "min": 5, "bin": ""}, "capacitor-1uf-electrolytic-50v": {"qty": 1, "min": 5, "bin": ""}, "capacitor-22uf": {"qty": 2, "min": 5, "bin": ""}, "capacitor-100uf-16v": {"qty": 2, "min": 5, "bin": ""}, "capacitor-47uf-63v": {"qty": 1, "min": 5, "bin": ""}, "capacitor-47uf-16v": {"qty": 1, "min": 5, "bin": ""}, "capacitor-47uf": {"qty": 1, "min": 5, "bin": ""}, "capacitor-42uf-400v": {"qty": 1, "min": 5, "bin": ""}, "capacitor-100uf-50v": {"qty": 4, "min": 5, "bin": ""}, "capacitor-330uf-10v": {"qty": 11, "min": 5, "bin": ""}, "capacitor-100uf-400v": {"qty": 1, "min": 5, "bin": ""}, "capacitor-150uf-250v": {"qty": 1, "min": 5, "bin": ""}}}];
