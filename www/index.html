@@ -149,6 +149,11 @@ main .wrap{padding-bottom:84px}
 .imp-wrap{max-height:45vh;overflow:auto;border:1px solid var(--line);border-radius:8px}
 .tag{display:inline-block;font-size:.7rem;font-weight:600;padding:1px 6px;border-radius:6px}
 .tag.new{background:var(--warn-bg);color:var(--warn)} .tag.err{background:var(--bad-bg);color:var(--bad)}
+.editbtn{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--muted);display:grid;place-items:center;padding:0}
+.editbtn svg{width:16px;height:16px}
+.editbtn:active{transform:scale(.94)}
+.pname .tag{font-family:var(--body)}
+.restore-link{border:0;background:none;color:var(--accent);font-weight:600;padding:10px 0;justify-self:center}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:.88rem;z-index:30;max-width:calc(100% - 32px)}
 @media (prefers-reduced-motion:no-preference){.qty{transition:background .2s,color .2s}}
 </style>
@@ -207,6 +212,7 @@ main .wrap{padding-bottom:84px}
     </div>
     <div class="note" id="count"></div>
     <div class="list" id="list"></div>
+    <button class="restore-link" id="delOpen" hidden></button>
     <div class="more" id="moreBox" hidden><span class="note">Loading more…</span></div>
   </div>
 
@@ -248,6 +254,7 @@ LED 5mm red, 2
       <label class="field">Low-stock level<input type="number" id="fMin" min="0" inputmode="numeric"></label>
       <label class="field" style="grid-column:1/-1">Bin / drawer location<input type="text" id="fBin" placeholder="e.g. Drawer A3"></label>
     </div>
+    <button class="linkbtn" id="shReset" type="button" hidden>Restore original details</button>
     <div class="actions">
       <button class="btn danger" id="shDel" hidden>Delete part</button>
       <button class="btn" id="shCancel">Cancel</button>
@@ -259,7 +266,7 @@ LED 5mm red, 2
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="catTitle">
     <h2 id="catTitle">Categories</h2>
     <div class="search"><input type="text" id="catName" placeholder="New category, e.g. Treadmill boards" aria-label="New category name"><button class="btn primary" id="catAdd">Add</button></div>
-    <div class="note">Your categories. A category can be deleted once no parts use it.</div>
+    <div class="note">Your categories. Rename any of them; delete one once no parts use it. Built-in categories can't be changed.</div>
     <div class="catlist" id="catList"></div>
     <div class="actions"><button class="btn" id="catClose">Done</button></div>
   </div>
@@ -310,6 +317,14 @@ LED 5mm red, 2
     <input type="file" id="impFile" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" aria-label="Excel file">
     <div id="impOut"></div>
     <div class="actions"><button class="btn" id="impClose">Close</button><button class="btn primary" id="impGo" hidden>Add to stock</button></div>
+  </div>
+</div>
+<div class="sheet-bg" id="delBg" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="delTitle">
+    <h2 id="delTitle">Deleted parts</h2>
+    <div class="note">Built-in catalog parts you deleted. Restore brings a part back with its stock and details.</div>
+    <div class="catlist" id="delList"></div>
+    <div class="actions"><button class="btn" id="delClose">Done</button></div>
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
@@ -465,6 +480,8 @@ C.forEach(p=>{
 const stock={};          // id -> {qty,min,bin}
 const custom={};         // id -> {name,cat,spec,pkg}
 const customCats={};     // id -> name
+const edits={};          // catalog part id -> {name,cat,spec,pkg} changed by you
+const hiddenIds={};      // catalog part id -> true when deleted
 let catCol=null;
 function cats(){return CATS.concat(Object.values(customCats).filter(n=>!CATS.includes(n)).sort((a,b)=>a.localeCompare(b)))}
 function catId(n){return "cat-"+n.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,60)}
@@ -473,7 +490,8 @@ const DEFAULT_MIN=5;
 let state={cat:"All",st:"all",q:"",limit:80};
 
 const $=id=>document.getElementById(id);
-function all(){return C.concat(Object.entries(custom).map(([id,c])=>({id,custom:true,...c})))}
+function all(){return C.filter(p=>!hiddenIds[p.id]).map(p=>edits[p.id]?{...p,...edits[p.id],edited:true}:p).concat(Object.entries(custom).map(([id,c])=>({id,custom:true,...c})))}
+function deletedParts(){return C.filter(p=>hiddenIds[p.id]).map(p=>edits[p.id]?{...p,...edits[p.id]}:p)}
 function rec(id){return stock[id]||{qty:0,min:DEFAULT_MIN,bin:""}}
 function status(id){const r=rec(id);const min=r.min??DEFAULT_MIN;return r.qty<=0?"out":r.qty<=min?"low":"in"}
 function norm(s){return String(s).toLowerCase().replace(/µ/g,"u").replace(/[Ωω\u2126]|ohms?\b/g,"").replace(/(\d)r(\d)/g,"$1.$2").replace(/(\d)r\b/g,"$1").replace(/[\s\-_,]+/g,"")}
@@ -554,13 +572,14 @@ function rowHTML(p){
   return `<div class="row" data-id="${p.id}">
     <span class="picon">${icon(p.cat)}</span>
     <button class="part" data-edit="${p.id}" aria-label="Edit ${esc(p.name)}">
-      <span class="pname">${esc(p.name)} ${p.cat==="Resistor"?bandsFor(p.name):""}</span>
+      <span class="pname">${esc(p.name)} ${p.cat==="Resistor"?bandsFor(p.name):""}${p.custom?'<span class="tag new">Mine</span>':p.edited?'<span class="tag new">Edited</span>':""}</span>
       <span class="pmeta">${esc(p.cat)} · ${esc(p.spec)} · ${esc(p.pkg)}${r.bin?` · <span class="bin">${esc(r.bin)}</span>`:""}</span>
     </button>
     <div class="ctrl">
       <button class="step" data-d="-1" data-id="${p.id}" aria-label="Remove one">−</button>
       <span class="qty st-${s}" title="${s==="low"?"At or below low-stock level ("+(r.min??DEFAULT_MIN)+")":""}">${label}</span>
       <button class="step" data-d="1" data-id="${p.id}" aria-label="Add one">+</button>
+      <button class="editbtn" data-edit="${p.id}" aria-label="Edit or delete ${esc(p.name)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></button>
     </div></div>`;
 }
 function renderList(){
@@ -568,12 +587,13 @@ function renderList(){
   $("count").textContent=`${f.length} part${f.length===1?"":"s"}`+(state.q?` matching “${state.q}”`:"")+(f.length>shown.length?` · showing ${shown.length}`:"");
   $("list").innerHTML=shown.length?shown.map(rowHTML).join(""):`<div class="empty">No parts match. Try another search, or use <b>Add part</b> to add it to your catalog.</div>`;
   $("moreBox").hidden=f.length<=shown.length;
+  const nd=Object.keys(hiddenIds).length; $("delOpen").hidden=!nd; $("delOpen").textContent=`Deleted parts (${nd}) · restore`;
 }
 function renderAll(){renderStats();renderCats();renderList(); if(!$("viewChk").hidden){quickCheck()}}
 
 // ---------- Persistence ----------
 const timers={}, writing={}, pending={};
-function payload(id){const r=rec(id);const o={qty:r.qty,min:r.min??DEFAULT_MIN,bin:r.bin||"",updatedAt:new Date().toISOString()}; if(custom[id]) Object.assign(o,custom[id],{custom:true}); return o}
+function payload(id){const r=rec(id);const o={qty:r.qty,min:r.min??DEFAULT_MIN,bin:r.bin||"",updatedAt:new Date().toISOString()}; if(custom[id]) Object.assign(o,custom[id],{custom:true}); if(edits[id]) o.edit={...edits[id]}; if(hiddenIds[id]) o.hidden=true; return o}
 function save(id,delay=700){
   if(local){saveLocal();setSync("Saved on this device only");return}
   if(!col) return;
@@ -588,7 +608,7 @@ async function flush(id){
   if(pending[id]){pending[id]=false;flush(id)}
 }
 async function remove(id){
-  delete stock[id]; delete custom[id];
+  delete stock[id]; delete custom[id]; delete edits[id]; delete hiddenIds[id];
   if(local){saveLocal();return}
   try{ await col.doc(id).delete() }catch(e){handleErr(e)}
 }
@@ -599,10 +619,10 @@ function handleErr(e){
   else toast("Couldn't save. Check your connection and try again.");
   setSync("Not saved");
 }
-function saveLocal(){try{localStorage.setItem("partsbin",JSON.stringify({stock,custom,customCats}))}catch(e){}}
-function loadLocal(){try{const d=JSON.parse(localStorage.getItem("partsbin")||"{}");Object.assign(stock,d.stock||{});Object.assign(custom,d.custom||{});Object.assign(customCats,d.customCats||{})}catch(e){}}
+function saveLocal(){try{localStorage.setItem("partsbin",JSON.stringify({stock,custom,customCats,edits,hiddenIds}))}catch(e){}}
+function loadLocal(){try{const d=JSON.parse(localStorage.getItem("partsbin")||"{}");Object.assign(stock,d.stock||{});Object.assign(custom,d.custom||{});Object.assign(customCats,d.customCats||{});Object.assign(edits,d.edits||{});Object.assign(hiddenIds,d.hiddenIds||{})}catch(e){}}
 function setSync(t){$("sync").textContent=t}
-function clearData(){[stock,custom,customCats].forEach(o=>{for(const k in o)delete o[k]})}
+function clearData(){[stock,custom,customCats,edits,hiddenIds].forEach(o=>{for(const k in o)delete o[k]})}
 
 // ---------- Firebase ----------
 let fs=null, auth=null, unsubs=[];
@@ -619,8 +639,10 @@ function startSync(){
       if(timers[d.id]||writing[d.id]) return;
       const v=d.data(); stock[d.id]={qty:+v.qty||0,min:v.min??DEFAULT_MIN,bin:v.bin||""};
       if(v.custom) custom[d.id]={name:v.name,cat:v.cat,spec:v.spec||"",pkg:v.pkg||""};
+      if(v.edit) edits[d.id]=v.edit; else delete edits[d.id];
+      if(v.hidden) hiddenIds[d.id]=true; else delete hiddenIds[d.id];
     });
-    snap.docChanges().forEach(ch=>{if(ch.type==="removed"){delete stock[ch.doc.id];delete custom[ch.doc.id]}});
+    snap.docChanges().forEach(ch=>{if(ch.type==="removed"){const i=ch.doc.id;delete stock[i];delete custom[i];delete edits[i];delete hiddenIds[i]}});
     if(!snap.metadata.fromCache){clearTimeout(timer);setSync(snap.metadata.hasPendingWrites?"Saving…":"Synced")}
     else setSync(navigator.onLine?"Loading…":"Offline. Changes will sync later.");
     renderAll();
@@ -655,7 +677,8 @@ const BK_FOLDER="FitX Parts Backups", BK_DUE_DAYS=7;
 let lastBackup=null;
 function backupData(){
   const out={app:"fitx-parts",version:1,exportedAt:new Date().toISOString(),stock:{},categories:{...customCats}};
-  for(const id in stock){ const o={...stock[id]}; if(custom[id]) Object.assign(o,custom[id],{custom:true}); out.stock[id]=o }
+  for(const id in stock){ const o={...stock[id]}; if(custom[id]) Object.assign(o,custom[id],{custom:true}); if(edits[id]) o.edit={...edits[id]}; if(hiddenIds[id]) o.hidden=true; out.stock[id]=o }
+  for(const id of new Set([...Object.keys(edits),...Object.keys(hiddenIds)])){ if(!out.stock[id]) out.stock[id]={qty:0,min:DEFAULT_MIN,bin:"",...(edits[id]?{edit:{...edits[id]}}:{}),...(hiddenIds[id]?{hidden:true}:{})} }
   for(const id in custom){ if(!out.stock[id]) out.stock[id]={qty:0,min:DEFAULT_MIN,bin:"",...custom[id],custom:true} }
   return out;
 }
@@ -684,7 +707,7 @@ async function restoreData(d){
   if(readOnly){toast("Your account can view stock but not change it.");return false}
   if(!d||d.app!=="fitx-parts"||!d.stock){toast("That isn't a FitX Parts backup.");return false}
   const ents=Object.entries(d.stock), cats_=Object.entries(d.categories||{});
-  for(const [id,v] of ents){ stock[id]={qty:Math.max(0,+v.qty||0),min:v.min??DEFAULT_MIN,bin:v.bin||""}; if(v.custom) custom[id]={name:v.name,cat:v.cat,spec:v.spec||"",pkg:v.pkg||""} }
+  for(const [id,v] of ents){ stock[id]={qty:Math.max(0,+v.qty||0),min:v.min??DEFAULT_MIN,bin:v.bin||""}; if(v.custom) custom[id]={name:v.name,cat:v.cat,spec:v.spec||"",pkg:v.pkg||""}; if(v.edit) edits[id]=v.edit; if(v.hidden) hiddenIds[id]=true; else if(v.hidden===false) delete hiddenIds[id] }
   for(const [id,n] of cats_) customCats[id]=n;
   try{
     if(local){ saveLocal() }
@@ -810,25 +833,31 @@ $("fCat").addEventListener("change",()=>{const n=$("fCat").value==="__new";$("fN
 function openSheet(id){
   if(readOnly){toast("You can view this stock list but not change it.");return}
   editing=id; const isNew=!id; const p=id?all().find(x=>x.id===id):null; const r=id?rec(id):{qty:0,min:DEFAULT_MIN,bin:""};
-  const isCustom=isNew||p.custom;
-  $("shTitle").textContent=isNew?"Add a part":p.name;
-  $("shCustom").hidden=!isCustom;
-  $("shInfo").innerHTML=isCustom?"":esc(`${p.cat} · ${p.spec} · ${p.pkg}`)+(p.fits&&p.fits.length?`<div style="margin-top:6px"><b>Fits:</b> ${p.fits.map(esc).join(", ")}</div>`:""); $("shInfo").hidden=isCustom;
-  if(isCustom){$("fName").value=p?.name||"";fillCatSelect(p?.cat||(state.cat!=="All"?state.cat:"IC"));$("fPkg").value=p?.pkg||"";$("fSpec").value=p?.spec||""}
+  $("shTitle").textContent=isNew?"Add a part":"Edit part";
+  $("shCustom").hidden=false;
+  $("shInfo").hidden=true;
+  $("fName").value=p?.name||""; fillCatSelect(p?.cat||(state.cat!=="All"?state.cat:"IC")); $("fPkg").value=p?.pkg||""; $("fSpec").value=p?.spec||"";
   $("fQty").value=r.qty; $("fMin").value=r.min??DEFAULT_MIN; $("fBin").value=r.bin||"";
-  $("shDel").hidden=!(p&&p.custom);
-  $("sheetBg").hidden=false; (isCustom?$("fName"):$("fQty")).focus();
+  $("shDel").hidden=isNew; $("shDel").dataset.confirm=""; $("shDel").textContent="Delete part";
+  $("shReset").hidden=!(p&&p.edited);
+  $("sheetBg").hidden=false; (isNew?$("fName"):$("fQty")).focus();
 }
 function closeSheet(){$("sheetBg").hidden=true;editing=null}
 $("addBtn").onclick=()=>openSheet(null);
 $("shCancel").onclick=closeSheet;
 $("sheetBg").addEventListener("click",e=>{if(e.target.id==="sheetBg")closeSheet()});
-document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("sheetBg").hidden)closeSheet();$("catBg").hidden=true;$("bkBg").hidden=true}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("sheetBg").hidden)closeSheet();$("catBg").hidden=true;$("bkBg").hidden=true;$("delBg").hidden=true}});
 $("shSave").onclick=()=>{
-  let id=editing;
+  let id=editing; const wasNew=!editing;
   const isCustom=!id||custom[id];
+  const name=$("fName").value.trim(); if(!name){toast("Enter a part name.");$("fName").focus();return}
+  if(!isCustom){
+    let cat=$("fCat").value;
+    if(cat==="__new"){cat=$("fNewCat").value.trim();if(!cat){toast("Enter a category name.");$("fNewCat").focus();return}cat=addCategory(cat)}
+    const o=C.find(x=>x.id===id), e={name,cat,spec:$("fSpec").value.trim(),pkg:$("fPkg").value.trim()};
+    if(o&&e.name===o.name&&e.cat===o.cat&&e.spec===o.spec&&e.pkg===o.pkg) delete edits[id]; else edits[id]=e;
+  }
   if(isCustom){
-    const name=$("fName").value.trim(); if(!name){toast("Enter a part name.");$("fName").focus();return}
     if(!id){ const exist=all().find(p=>norm(p.name)===norm(name)); if(exist){toast(`${exist.name} is already in the catalog. Opened it for you.`);openSheet(exist.id);return}
       id="c-"+norm(name).replace(/[^a-z0-9.]/g,"").slice(0,40)+"-"+Math.random().toString(36).slice(2,6); }
     let cat=$("fCat").value;
@@ -836,10 +865,26 @@ $("shSave").onclick=()=>{
     custom[id]={name,cat,spec:$("fSpec").value.trim(),pkg:$("fPkg").value.trim()};
   }
   stock[id]={qty:Math.max(0,parseInt($("fQty").value)||0),min:Math.max(0,parseInt($("fMin").value)||0),bin:$("fBin").value.trim()};
-  closeSheet(); setSync("Saving…"); renderAll(); save(id,0); toast(isCustom&&!editing?"Part added":"Saved");
+  closeSheet(); setSync("Saving…"); renderAll(); save(id,0); toast(wasNew?"Part added":"Saved");
 };
-$("shDel").onclick=()=>{const id=editing; if(!id)return; if($("shDel").dataset.confirm!=="1"){$("shDel").dataset.confirm="1";$("shDel").textContent="Tap again to delete";return}
-  $("shDel").dataset.confirm="";$("shDel").textContent="Delete part"; closeSheet(); remove(id); renderAll(); toast("Part deleted")};
+$("shDel").onclick=()=>{const id=editing; if(!id)return; const q=rec(id).qty||0;
+  if($("shDel").dataset.confirm!=="1"){$("shDel").dataset.confirm="1";$("shDel").textContent=q?`Tap again to delete (${q} in stock)`:"Tap again to delete";return}
+  $("shDel").dataset.confirm="";$("shDel").textContent="Delete part"; const name=(all().find(x=>x.id===id)||{}).name||"Part"; closeSheet();
+  if(custom[id]){ remove(id); toast(`Deleted “${name}”`) }
+  else { hiddenIds[id]=true; save(id,0); toast(`Deleted “${name}”. Restore it from Deleted parts at the bottom of the list.`) }
+  renderAll()};
+$("shReset").onclick=()=>{const id=editing; if(!id||!edits[id])return; delete edits[id]; save(id,0); closeSheet(); renderAll(); toast("Original details restored")};
+
+// Deleted parts: list and restore
+function renderDelList(){
+  const d=deletedParts().sort((a,b)=>a.name.localeCompare(b.name));
+  $("delList").innerHTML=d.length?d.map(p=>`<div class="catitem"><span><b>${esc(p.name)}</b> <span class="n">${esc(p.cat)}${rec(p.id).qty?` · ${rec(p.id).qty} in stock`:""}</span></span><button class="btn" data-restore="${p.id}">Restore</button></div>`).join(""):`<div class="note">No deleted parts.</div>`;
+}
+$("delOpen").onclick=()=>{renderDelList();$("delBg").hidden=false};
+$("delClose").onclick=()=>$("delBg").hidden=true;
+$("delBg").addEventListener("click",e=>{ if(e.target.id==="delBg"){$("delBg").hidden=true;return}
+  const b=e.target.closest("[data-restore]"); if(!b) return; const id=b.dataset.restore;
+  delete hiddenIds[id]; save(id,0); renderAll(); renderDelList(); toast("Part restored"); if(!Object.keys(hiddenIds).length) $("delBg").hidden=true });
 
 // ---------- Availability ----------
 function findPart(q){
@@ -893,14 +938,31 @@ function renderCatList(){
   const counts={}; all().forEach(p=>counts[p.cat]=(counts[p.cat]||0)+1);
   const ids=Object.keys(customCats).sort((a,b)=>customCats[a].localeCompare(customCats[b]));
   $("catList").innerHTML=ids.length?ids.map(id=>{const n=customCats[id],c=counts[n]||0;
-    return `<div class="catitem"><span>${esc(n)} <span class="n">${c} part${c===1?"":"s"}</span></span>${c?`<span class="n">In use</span>`:`<button class="btn danger" data-delcat="${id}">Delete</button>`}</div>`}).join(""):`<div class="note">No categories of your own yet. The ${CATS.length} built-in ones are always available.</div>`;
+    return `<div class="catitem" data-catrow="${id}"><span>${esc(n)} <span class="n">${c} part${c===1?"":"s"}</span></span><span class="ctrl"><button class="btn" data-rencat="${id}">Rename</button>${c?`<span class="n">In use</span>`:`<button class="btn danger" data-delcat="${id}">Delete</button>`}</span></div>`}).join(""):`<div class="note">No categories of your own yet. The ${CATS.length} built-in ones are always available.</div>`;
 }
 function openCats(){if(readOnly){toast("You can view this stock list but not change it.");return}renderCatList();$("catBg").hidden=false;$("catName").focus()}
 $("catAdd").onclick=()=>{const n=$("catName").value.trim();if(!n){toast("Enter a category name.");return}
   const before=cats().length;const got=addCategory(n);$("catName").value="";renderAll();renderCatList();toast(cats().length>before?`Added “${got}”`:`“${got}” already exists`)};
 $("catName").addEventListener("keydown",e=>{if(e.key==="Enter")$("catAdd").click()});
 $("catClose").onclick=()=>$("catBg").hidden=true;
+function renameCategory(id,newName){
+  const old=customCats[id]; newName=newName.replace(/\s+/g," ").trim();
+  if(!newName||newName===old) return;
+  if(cats().some(c=>c.toLowerCase()===newName.toLowerCase()&&c!==old)){toast(`“${newName}” already exists`);return}
+  delete customCats[id]; const nid=catId(newName); customCats[nid]=newName;
+  for(const pid in custom) if(custom[pid].cat===old){custom[pid].cat=newName; save(pid,0)}
+  for(const pid in edits) if(edits[pid].cat===old){edits[pid].cat=newName; save(pid,0)}
+  if(state.cat===old) state.cat=newName;
+  if(local) saveLocal(); else if(catCol){ catCol.doc(id).delete().catch(handleErr); catCol.doc(nid).set({name:newName,createdAt:new Date().toISOString()}).catch(handleErr) }
+  renderAll(); renderCatList(); toast(`Renamed to “${newName}”`);
+}
 $("catBg").addEventListener("click",e=>{if(e.target.id==="catBg")$("catBg").hidden=true;
+  const rn=e.target.closest("[data-rencat]");
+  if(rn){ const id=rn.dataset.rencat, row=rn.closest("[data-catrow]");
+    row.innerHTML=`<input type="text" id="renIn" value="${esc(customCats[id])}" aria-label="New category name"><span class="ctrl"><button class="btn primary" data-rensave="${id}">Save</button><button class="btn" data-rencancel="1">Cancel</button></span>`;
+    const inp=$("renIn"); inp.focus(); inp.select(); inp.addEventListener("keydown",k=>{if(k.key==="Enter")renameCategory(id,inp.value)}); return }
+  const rs=e.target.closest("[data-rensave]"); if(rs){ renameCategory(rs.dataset.rensave,$("renIn").value); return }
+  if(e.target.closest("[data-rencancel]")){ renderCatList(); return }
   const d=e.target.closest("[data-delcat]"); if(!d)return;
   if(d.dataset.confirm!=="1"){d.dataset.confirm="1";d.textContent="Tap again";return}
   const id=d.dataset.delcat,n=customCats[id];delete customCats[id];if(state.cat===n)state.cat="All";
