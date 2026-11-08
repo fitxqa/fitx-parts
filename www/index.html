@@ -154,6 +154,33 @@ main .wrap{padding-bottom:84px}
 .editbtn:active{transform:scale(.94)}
 .pname .tag{font-family:var(--body)}
 .restore-link{border:0;background:none;color:var(--accent);font-weight:600;padding:10px 0;justify-self:center}
+.beltcalc{border:1.5px solid var(--accent);background:var(--icon-bg);border-radius:10px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.beltcalc .big{font:700 1.15rem var(--mono);color:var(--ink)}
+.beltcalc .sub{font-size:.8rem;color:var(--muted)}
+.fhint{font-size:.8rem;color:var(--accent);font-weight:600}
+.rep-opts{display:grid;gap:8px}
+.rep-opts .chips{flex-wrap:wrap;overflow:visible}
+.rep-paper{background:#fff;color:#111;border:1px solid var(--line);border-radius:8px;padding:16px;max-height:52vh;overflow:auto;font-size:12px}
+.rep-paper h4{margin:12px 0 4px;font:700 13px var(--display);text-transform:uppercase;letter-spacing:.04em;color:#c24e00;border-bottom:1.5px solid #f26200;padding-bottom:3px}
+.rep-paper table{width:100%;border-collapse:collapse}
+.rep-paper th{background:#f26200;color:#fff;text-align:left;padding:4px 5px;font-size:10.5px}
+.rep-paper td{padding:3px 5px;border-bottom:1px solid #e6e6e6;font-size:11px}
+.rep-paper td.r,.rep-paper th.r{text-align:right}
+.rep-paper .sub td{font-weight:700;background:#fff4ec}
+.rep-head{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;border-bottom:3px solid #f26200;padding-bottom:8px}
+.rep-head .lg{font:700 26px/1 var(--display);color:#111}.rep-head .lg b{color:#f26200}
+.rep-head small{display:block;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#666}
+.rep-sum{display:flex;gap:14px;flex-wrap:wrap;margin:8px 0;font-size:11px}
+.rep-sum b{font-family:var(--mono)}
+.rep-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+@media (max-width:420px){.rep-actions{grid-template-columns:1fr 1fr}}
+@media print{
+  body *{visibility:hidden!important}
+  #repPaper,#repPaper *{visibility:visible!important}
+  #repPaper{position:absolute;left:0;top:0;width:100%;max-height:none;overflow:visible;border:0;padding:0}
+  #repPaper tr{break-inside:avoid}
+  @page{size:A4;margin:12mm}
+}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:.88rem;z-index:30;max-width:calc(100% - 32px)}
 @media (prefers-reduced-motion:no-preference){.qty{transition:background .2s,color .2s}}
 </style>
@@ -175,7 +202,7 @@ main .wrap{padding-bottom:84px}
   <div class="wrap">
     <div class="brand">
       <div class="logo" aria-label="FitX Sports Equipment Services"><span class="mark" aria-hidden="true">Fit<b>X</b></span><div class="logo-sub"><small>Sports Equipment Services</small><h1>Parts Bin Stock</h1></div></div>
-      <div class="hdr-actions"><span class="sync" id="sync">Connecting…</span><span class="sync" id="verTag"></span><button class="linkbtn" id="installBtn" hidden>Install app</button><button class="linkbtn" id="importOpen">Import</button><button class="linkbtn" id="backupOpen">Backup</button><button class="linkbtn" id="signOut" hidden>Sign out</button></div>
+      <div class="hdr-actions"><span class="sync" id="sync">Connecting…</span><span class="sync" id="verTag"></span><button class="linkbtn" id="installBtn" hidden>Install app</button><button class="linkbtn" id="reportOpen">Report</button><button class="linkbtn" id="importOpen">Import</button><button class="linkbtn" id="backupOpen">Backup</button><button class="linkbtn" id="signOut" hidden>Sign out</button></div>
     </div>
     <div class="stats">
       <div class="stat"><b id="sTotal">0</b> parts in catalog</div>
@@ -210,6 +237,7 @@ main .wrap{padding-bottom:84px}
         <button class="lock" id="lockBtn" aria-pressed="false"></button>
       </div>
     </div>
+    <div class="beltcalc" id="beltHint" hidden></div>
     <div class="note" id="count"></div>
     <div class="list" id="list"></div>
     <button class="restore-link" id="delOpen" hidden></button>
@@ -242,7 +270,7 @@ LED 5mm red, 2
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="shTitle">
     <h2 id="shTitle">Edit part</h2>
     <div id="shCustom" class="grid2">
-      <label class="field" style="grid-column:1/-1">Part name<input type="text" id="fName" placeholder="e.g. LM2903"></label>
+      <label class="field" style="grid-column:1/-1">Part name<input type="text" id="fName" placeholder="e.g. LM2903"><span class="fhint" id="fBeltHint" hidden></span></label>
       <label class="field">Category<select id="fCat"></select></label>
       <label class="field">Package<input type="text" id="fPkg" placeholder="DIP-8, SOT-23…"></label>
       <label class="field" id="fNewCatBox" style="grid-column:1/-1" hidden>New category name<input type="text" id="fNewCat" placeholder="e.g. Treadmill boards"></label>
@@ -325,6 +353,32 @@ LED 5mm red, 2
     <div class="note">Built-in catalog parts you deleted. Restore brings a part back with its stock and details.</div>
     <div class="catlist" id="delList"></div>
     <div class="actions"><button class="btn" id="delClose">Done</button></div>
+  </div>
+</div>
+<div class="sheet-bg" id="repBg" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="repTitle" style="max-width:760px">
+    <h2 id="repTitle">Stock report</h2>
+    <div class="rep-opts">
+      <div class="field">Categories
+        <div class="chips" id="repCats"></div>
+      </div>
+      <div class="field">Parts to include
+        <div class="chips" id="repWhich">
+          <button class="chip" data-which="in" aria-pressed="true">In stock</button>
+          <button class="chip" data-which="reorder" aria-pressed="false">Low &amp; out (reorder)</button>
+          <button class="chip" data-which="all" aria-pressed="false">All parts</button>
+        </div>
+      </div>
+    </div>
+    <div class="note" id="repInfo"></div>
+    <div class="rep-paper" id="repPaper"></div>
+    <div class="rep-actions">
+      <button class="btn" id="repPrint">Print</button>
+      <button class="btn" id="repPdf">Preview PDF</button>
+      <button class="btn primary" id="repSave">Save PDF</button>
+      <button class="btn primary" id="repShare">Share PDF</button>
+    </div>
+    <div class="actions"><button class="btn" id="repClose">Close</button></div>
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
@@ -451,7 +505,122 @@ T("Cardio wiring",[
  ["Console cable 6-pin","Console to lower board","Cable"],["Console cable 8-pin","Console to MCB","Cable"],["Console cable 10-pin","Console to MCB","Cable"],["Console cable 12-pin","Console to MCB","Cable"],["Console data cable RJ45","Cat5 console cable","Cable"],["Middle cable (upright)","Upright tube harness","Cable"],["Lower cable","Base harness","Cable"],["Speed sensor cable","With connector","Cable"],["Incline motor cable","Motor harness","Cable"],["Safety key cable","Key switch harness","Cable"],["Hand pulse extension","Grip harness","Cable"],["Motor wire with terminals","Drive motor leads","Cable"],["Power cord 16A C19","Commercial treadmill","Cable"],["Power cord 10A C13","Bike/elliptical","Cable"],["Ground strap","Earth bonding","Cable"],["Wire 14AWG red/black","Silicone, per metre","Metre"],["Wire 18AWG","Hook-up, per metre","Metre"],["Wire 22AWG","Signal, per metre","Metre"],["Crimp terminal kit","Molex/JST pins","Kit"],["Ferrite clamp","EMI cable clamp","Part"]
 ]);
 T("Bearing",[
- ["6000-2RS","10x26x8","Bearing"],["6001-2RS","12x28x8","Bearing"],["6002-2RS","15x32x9","Bearing"],["6003-2RS","17x35x10","Bearing"],["6004-2RS","20x42x12","Bearing"],["6200-2RS","10x30x9","Bearing"],["6201-2RS","12x32x10","Bearing"],["6202-2RS","15x35x11","Bearing"],["6203-2RS","17x40x12","Bearing"],["6204-2RS","20x47x14","Bearing"],["6205-2RS","25x52x15","Bearing"],["6301-2RS","12x37x12","Bearing"],["6302-2RS","15x42x13","Bearing"],["608-2RS","8x22x7","Bearing"],["6900-2RS","10x22x6","Bearing"],["6901-2RS","12x24x6","Bearing"],["6902-2RS","15x28x7","Bearing"],["Pillow block UCP204","20mm bore","Unit"],["Linear bearing LM20UU","20mm shaft","Bearing"],["Rod end bearing M10","Elliptical link","Part"]
+ ["6000-2RS","Deep groove 10x26x8 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6001-2RS","Deep groove 12x28x8 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6002-2RS","Deep groove 15x32x9 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6003-2RS","Deep groove 17x35x10 mm · sealed 2RS (ZZ same size) · roller","Bearing"],
+ ["6004-2RS","Deep groove 20x42x12 mm · sealed 2RS (ZZ same size) · treadmill roller","Bearing"],
+ ["6005-2RS","Deep groove 25x47x12 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6006-2RS","Deep groove 30x55x13 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6007-2RS","Deep groove 35x62x14 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6008-2RS","Deep groove 40x68x15 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6009-2RS","Deep groove 45x75x16 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6010-2RS","Deep groove 50x80x16 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6011-2RS","Deep groove 55x90x18 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6012-2RS","Deep groove 60x95x18 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6200-2RS","Deep groove 10x30x9 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6201-2RS","Deep groove 12x32x10 mm · sealed 2RS (ZZ same size) · motor","Bearing"],
+ ["6202-2RS","Deep groove 15x35x11 mm · sealed 2RS (ZZ same size) · motor / roller","Bearing"],
+ ["6203-2RS","Deep groove 17x40x12 mm · sealed 2RS (ZZ same size) · treadmill roller","Bearing"],
+ ["6204-2RS","Deep groove 20x47x14 mm · sealed 2RS (ZZ same size) · treadmill roller","Bearing"],
+ ["6205-2RS","Deep groove 25x52x15 mm · sealed 2RS (ZZ same size) · roller","Bearing"],
+ ["6206-2RS","Deep groove 30x62x16 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6207-2RS","Deep groove 35x72x17 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6208-2RS","Deep groove 40x80x18 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6209-2RS","Deep groove 45x85x19 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6210-2RS","Deep groove 50x90x20 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6211-2RS","Deep groove 55x100x21 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6212-2RS","Deep groove 60x110x22 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6300-2RS","Deep groove 10x35x11 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6301-2RS","Deep groove 12x37x12 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6302-2RS","Deep groove 15x42x13 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6303-2RS","Deep groove 17x47x14 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6304-2RS","Deep groove 20x52x15 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6305-2RS","Deep groove 25x62x17 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6306-2RS","Deep groove 30x72x19 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6307-2RS","Deep groove 35x80x21 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6308-2RS","Deep groove 40x90x23 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6309-2RS","Deep groove 45x100x25 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6310-2RS","Deep groove 50x110x27 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6800-2RS","Deep groove 10x19x5 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6801-2RS","Deep groove 12x21x5 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6802-2RS","Deep groove 15x24x5 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6803-2RS","Deep groove 17x26x5 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6804-2RS","Deep groove 20x32x7 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6805-2RS","Deep groove 25x37x7 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6806-2RS","Deep groove 30x42x7 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6807-2RS","Deep groove 35x47x7 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6808-2RS","Deep groove 40x52x7 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6809-2RS","Deep groove 45x58x7 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6810-2RS","Deep groove 50x65x7 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6900-2RS","Deep groove 10x22x6 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6901-2RS","Deep groove 12x24x6 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6902-2RS","Deep groove 15x28x7 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6903-2RS","Deep groove 17x30x7 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6904-2RS","Deep groove 20x37x9 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6905-2RS","Deep groove 25x42x9 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6906-2RS","Deep groove 30x47x9 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6907-2RS","Deep groove 35x55x10 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6908-2RS","Deep groove 40x62x12 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6909-2RS","Deep groove 45x68x12 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["6910-2RS","Deep groove 50x72x12 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["623-2RS","Deep groove 3x10x4 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["624-2RS","Deep groove 4x13x5 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["625-2RS","Deep groove 5x16x5 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["626-2RS","Deep groove 6x19x6 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["627-2RS","Deep groove 7x22x7 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["628-2RS","Deep groove 8x24x8 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["629-2RS","Deep groove 9x26x8 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["635-2RS","Deep groove 5x19x6 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["608-2RS","Deep groove 8x22x7 mm · sealed 2RS (ZZ same size) · skate / idler","Bearing"],
+ ["609-2RS","Deep groove 9x24x7 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["688-2RS","Deep groove 8x16x5 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["696-2RS","Deep groove 6x15x5 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["698-2RS","Deep groove 8x19x6 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["699-2RS","Deep groove 9x20x6 mm · sealed 2RS (ZZ same size)","Bearing"],
+ ["Pillow block UCP201","Pillow block 12 mm bore (UC201 insert)","Unit"],
+ ["Pillow block UCP202","Pillow block 15 mm bore (UC202 insert)","Unit"],
+ ["Pillow block UCP203","Pillow block 17 mm bore (UC203 insert)","Unit"],
+ ["Pillow block UCP204","Pillow block 20 mm bore (UC204 insert)","Unit"],
+ ["Pillow block UCP205","Pillow block 25 mm bore (UC205 insert)","Unit"],
+ ["Pillow block UCP206","Pillow block 30 mm bore (UC206 insert)","Unit"],
+ ["Pillow block UCP207","Pillow block 35 mm bore (UC207 insert)","Unit"],
+ ["Pillow block UCP208","Pillow block 40 mm bore (UC208 insert)","Unit"],
+ ["Pillow block UCP209","Pillow block 45 mm bore (UC209 insert)","Unit"],
+ ["Pillow block UCP210","Pillow block 50 mm bore (UC210 insert)","Unit"],
+ ["Flange bearing UCF204","4-bolt flange 20 mm bore","Unit"],
+ ["Flange bearing UCFL204","2-bolt flange 20 mm bore","Unit"],
+ ["Flange bearing UCF205","4-bolt flange 25 mm bore","Unit"],
+ ["Flange bearing UCFL205","2-bolt flange 25 mm bore","Unit"],
+ ["Flange bearing UCF206","4-bolt flange 30 mm bore","Unit"],
+ ["Flange bearing UCFL206","2-bolt flange 30 mm bore","Unit"],
+ ["Linear bearing LM8UU","Linear ball bushing 8x15x24 mm","Bearing"],
+ ["Linear bearing LM10UU","Linear ball bushing 10x19x29 mm","Bearing"],
+ ["Linear bearing LM12UU","Linear ball bushing 12x21x30 mm","Bearing"],
+ ["Linear bearing LM16UU","Linear ball bushing 16x28x37 mm","Bearing"],
+ ["Linear bearing LM20UU","Linear ball bushing 20x32x42 mm","Bearing"],
+ ["Linear bearing LM25UU","Linear ball bushing 25x40x59 mm","Bearing"],
+ ["Linear bearing LM30UU","Linear ball bushing 30x45x64 mm","Bearing"],
+ ["51100","Thrust ball 10x24x9 mm","Bearing"],
+ ["51101","Thrust ball 12x26x9 mm","Bearing"],
+ ["51102","Thrust ball 15x28x9 mm","Bearing"],
+ ["51103","Thrust ball 17x30x9 mm","Bearing"],
+ ["51104","Thrust ball 20x35x10 mm","Bearing"],
+ ["51105","Thrust ball 25x42x11 mm","Bearing"],
+ ["HK0810","Needle roller 8x12x10 mm","Bearing"],
+ ["HK1010","Needle roller 10x14x10 mm","Bearing"],
+ ["HK1212","Needle roller 12x18x12 mm","Bearing"],
+ ["HK1512","Needle roller 15x21x12 mm","Bearing"],
+ ["HK2016","Needle roller 20x26x16 mm","Bearing"],
+ ["PHS8","Rod end M8 thread · elliptical / link arm","Part"],
+ ["Rod end bearing M10","Rod end M10 thread · elliptical / link arm","Part"],
+ ["PHS12","Rod end M12 thread · elliptical / link arm","Part"],
+ ["POS10","Rod end M10 male thread · elliptical / link arm","Part"],
+ ["1204","Self-aligning ball 20x47x14 mm","Bearing"],
+ ["1205","Self-aligning ball 25x52x15 mm","Bearing"],
+ ["2204","Self-aligning ball 20x47x18 mm","Bearing"],
+ ["Bearing 6203 C3 (motor)","17x40x12 mm high-speed motor bearing","Bearing"],
+ ["Bearing 6202 C3 (motor)","15x35x11 mm high-speed motor bearing","Bearing"]
 ]);
 // Electrolytic capacitors by voltage (FitX stock list)
 T("Capacitor",[
@@ -587,6 +756,7 @@ function renderList(){
   $("count").textContent=`${f.length} part${f.length===1?"":"s"}`+(state.q?` matching “${state.q}”`:"")+(f.length>shown.length?` · showing ${shown.length}`:"");
   $("list").innerHTML=shown.length?shown.map(rowHTML).join(""):`<div class="empty">No parts match. Try another search, or use <b>Add part</b> to add it to your catalog.</div>`;
   $("moreBox").hidden=f.length<=shown.length;
+  renderBeltHint();
   const nd=Object.keys(hiddenIds).length; $("delOpen").hidden=!nd; $("delOpen").textContent=`Deleted parts (${nd}) · restore`;
 }
 function renderAll(){renderStats();renderCats();renderList(); if(!$("viewChk").hidden){quickCheck()}}
@@ -829,6 +999,17 @@ $("tabInv").onclick=()=>tab(false); $("tabChk").onclick=()=>tab(true);
 // Sheet
 let editing=null;
 function fillCatSelect(sel){$("fCat").innerHTML=cats().map(c=>`<option>${esc(c)}</option>`).join("")+`<option value="__new">+ New category…</option>`;$("fCat").value=sel;$("fNewCatBox").hidden=true;$("fNewCat").value=""}
+function formBeltHint(){
+  const b=beltParse($("fName").value), h=$("fBeltHint");
+  if(!b||($("fCat").value!=="Drive belt"&&!/^\d+(\.\d)?J$|PJ/i.test($("fName").value.trim()))){h.hidden=true;return}
+  const j=b.from==="J"?b.j:b.mm/2.54, mm=b.from==="J"?b.j*2.54:b.mm;
+  h.textContent=`= ${Math.round(j)}J (PJ${Math.round(mm)}) · exact ${j.toFixed(1)}J / ${mm.toFixed(1)} mm`; h.hidden=false;
+}
+$("fName").addEventListener("input",formBeltHint);
+$("fName").addEventListener("blur",()=>{ const b=beltParse($("fName").value); if(!b) return;
+  const j=Math.round(b.from==="J"?b.j:b.mm/2.54), mm=Math.round(b.from==="J"?b.j*2.54:b.mm);
+  $("fName").value=`${j}J (PJ${mm})`; if($("fCat").value!=="Drive belt") fillCatSelect("Drive belt");
+  if(!$("fPkg").value) $("fPkg").value="Poly-V"; if(!$("fSpec").value) $("fSpec").value="PJ drive belt"+(b.ribs?` · ${b.ribs} ribs`:""); formBeltHint() });
 $("fCat").addEventListener("change",()=>{const n=$("fCat").value==="__new";$("fNewCatBox").hidden=!n;if(n)$("fNewCat").focus()});
 function openSheet(id){
   if(readOnly){toast("You can view this stock list but not change it.");return}
@@ -971,6 +1152,144 @@ $("catBg").addEventListener("click",e=>{if(e.target.id==="catBg")$("catBg").hidd
 
 // toast
 let tT; function toast(t){const el=$("toast");el.textContent=t;el.hidden=false;clearTimeout(tT);tT=setTimeout(()=>el.hidden=true,2600)}
+
+
+// ---------- Drive belt size converter (J <-> PJ) ----------
+// 1 J = 0.1 inch of effective length; PJ = length in mm. PJ mm = J x 2.54.
+function beltParse(q){
+  const t=String(q).trim().toUpperCase().replace(/\s+/g,"");
+  let m=/^(\d{2,4}(?:\.\d)?)J(\d{1,3})?$/.exec(t); if(m) return {j:+m[1],from:"J",ribs:m[2]?+m[2]:null};
+  m=/^(?:(\d{1,3})PJ(\d{3,4})|PJ(\d{3,4})|(\d{3,4})PJ|(\d{3,4})MM)$/.exec(t);
+  if(m){ const mm=+(m[2]||m[3]||m[4]||m[5]); return {mm,from:"PJ",ribs:m[1]?+m[1]:null} }
+  return null;
+}
+function beltCalc(q){
+  const b=beltParse(q); if(!b) return null;
+  if(b.from==="J"){ b.mm=b.j*2.54 } else { b.j=b.mm/2.54 }
+  b.jR=Math.round(b.j); b.mmR=Math.round(b.mm);
+  const belts=all().filter(p=>p.cat==="Drive belt"&&/^\d+J \(PJ\d+\)$/.test(p.name)).map(p=>{const [_,j,mm]=/^(\d+)J \(PJ(\d+)\)$/.exec(p.name);return {p,j:+j,mm:+mm}});
+  b.exact=belts.find(x=>Math.abs(x.mm-b.mm)<=2);
+  b.near=belts.filter(x=>x!==b.exact&&Math.abs(x.mm-b.mm)<=15).sort((x,y)=>Math.abs(x.mm-b.mm)-Math.abs(y.mm-b.mm)).slice(0,3);
+  return b;
+}
+function renderBeltHint(){
+  const el=$("beltHint"), b=state.q?beltCalc(state.q):null;
+  if(!b){ el.hidden=true; return }
+  const main=b.from==="J"?`${b.j}J = PJ${b.mm.toFixed(1)} mm`:`PJ${b.mm} mm = ${b.j.toFixed(1)}J`;
+  const ribs=b.ribs?` · ${b.ribs} ribs`:"";
+  const near=b.near.length?`Near sizes: ${b.near.map(x=>`${x.j}J (PJ${x.mm})`).join(", ")}`:"";
+  el.innerHTML=`<div><div class="big">${esc(main)}${ribs}</div><div class="sub">${b.exact?`In catalog: <b>${esc(b.exact.p.name)}</b> · ${rec(b.exact.p.id).qty||0} in stock`:"Not in catalog yet"}${near?" · "+esc(near):""}</div></div>`+
+    (b.exact?`<button class="btn" data-edit="${b.exact.p.id}">Open</button>`:`<button class="btn primary" id="beltAdd">Add ${b.jR}J (PJ${b.mmR})</button>`);
+  el.hidden=false;
+  const ab=$("beltAdd"); if(ab) ab.onclick=()=>{ openSheet(null); $("fName").value=`${b.jR}J (PJ${b.mmR})`; fillCatSelect("Drive belt"); $("fSpec").value="PJ drive belt"+(b.ribs?` · ${b.ribs} ribs`:""); $("fPkg").value="Poly-V"; $("fQty").focus() };
+}
+
+
+// ---------- Stock report: preview, print, save PDF, share PDF ----------
+const rep={cats:new Set(),which:"in"};
+function repParts(){
+  const W=rep.which, sel=rep.cats;
+  return all().filter(p=>(!sel.size||sel.has(p.cat))&&(W==="all"||(W==="in"?(rec(p.id).qty||0)>0:status(p.id)!=="in")));
+}
+function repGroups(){
+  const order=cats(), g=new Map();
+  repParts().forEach(p=>{ if(!g.has(p.cat)) g.set(p.cat,[]); g.get(p.cat).push(p) });
+  return [...g.entries()].sort((a,b)=>order.indexOf(a[0])-order.indexOf(b[0])).map(([c,l])=>[c,l.sort((x,y)=>x.name.localeCompare(y.name,undefined,{numeric:true}))]);
+}
+function repTitleText(){ const W={in:"Stock in hand",reorder:"Reorder list (low & out of stock)",all:"Full parts list"}[rep.which]; return W+(rep.cats.size===1?` · ${[...rep.cats][0]}`:rep.cats.size?` · ${rep.cats.size} categories`:" · All categories") }
+function repStamp(){ return new Date().toLocaleString(undefined,{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) }
+function statusTxt(id){ return {in:"OK",low:"Low",out:"Out"}[status(id)] }
+function renderRepCats(){
+  const W=rep.which, counts={};
+  all().forEach(p=>{ if(W==="all"||(W==="in"?(rec(p.id).qty||0)>0:status(p.id)!=="in")) counts[p.cat]=(counts[p.cat]||0)+1 });
+  for(const c of [...rep.cats]) if(!counts[c]) rep.cats.delete(c);
+  $("repCats").innerHTML=`<button class="chip" data-rcat="" aria-pressed="${!rep.cats.size}">All</button>`+cats().filter(c=>counts[c]).map(c=>`<button class="chip" data-rcat="${esc(c)}" aria-pressed="${rep.cats.has(c)}">${icon(c,"ci")}${esc(c)}<span class="n">${counts[c]||0}</span></button>`).join("");
+}
+function renderReport(){
+  const G=repGroups(), nParts=G.reduce((a,[,l])=>a+l.length,0), pcs=G.reduce((a,[,l])=>a+l.reduce((s,p)=>s+(rec(p.id).qty||0),0),0);
+  $("repInfo").textContent=`${nParts} parts in ${G.length} categor${G.length===1?"y":"ies"} · ${pcs} pieces`;
+  const head=`<div class="rep-head"><div><div class="lg">Fit<b>X</b></div><small>Sports Equipment Services</small></div><div style="text-align:right"><b style="font-size:14px">${esc(repTitleText())}</b><br><span style="font-size:10px;color:#666">${esc(repStamp())}</span></div></div>
+    <div class="rep-sum"><span>Parts <b>${nParts}</b></span><span>Pieces <b>${pcs}</b></span><span>Categories <b>${G.length}</b></span></div>`;
+  const body=G.length?G.map(([c,l])=>{ let n=0, sum=0;
+    return `<h4>${esc(c)} (${l.length})</h4><table><thead><tr><th class="r">#</th><th>Part</th><th>Description</th><th>Bin</th><th class="r">Qty</th><th class="r">Low at</th><th>Status</th></tr></thead><tbody>`+
+      l.map(p=>{const r=rec(p.id); sum+=r.qty||0; return `<tr><td class="r">${++n}</td><td><b>${esc(p.name)}</b></td><td>${esc([p.spec,p.pkg].filter(Boolean).join(" · "))}</td><td>${esc(r.bin||"")}</td><td class="r"><b>${r.qty||0}</b></td><td class="r">${r.min??DEFAULT_MIN}</td><td>${statusTxt(p.id)}</td></tr>`}).join("")+
+      `<tr class="sub"><td></td><td colspan="3">Total ${esc(c)}</td><td class="r">${sum}</td><td colspan="2"></td></tr></tbody></table>` }).join("")
+    :`<p style="color:#666">No parts match these choices.</p>`;
+  $("repPaper").innerHTML=head+body;
+}
+function loadScript(src){return new Promise((res,rej)=>{ const sc=document.createElement("script"); sc.src=src; sc.onload=()=>res(); sc.onerror=()=>rej(new Error("Couldn't load the PDF maker. Check the internet connection.")); document.head.appendChild(sc) })}
+async function loadPdfLibs(){ if(!window.jspdf) await loadScript("vendor/jspdf.umd.min.js"); if(!window.jspdf.jsPDF.API.autoTable) await loadScript("vendor/jspdf.plugin.autotable.min.js") }
+function pdfTxt(t){ return String(t??"").replace(/[\u00B5\u03BC]/g,"u").replace(/[ΩωΩ]/g," ohm").replace(/[‒-―−]/g,"-").replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/…/g,"...").replace(/[^\x00-\xFF]/g,"") }
+async function buildPdf(){
+  await loadPdfLibs();
+  const {jsPDF}=window.jspdf, doc=new jsPDF({unit:"mm",format:"a4"}), W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight();
+  const G=repGroups(), nParts=G.reduce((a,[,l])=>a+l.length,0), pcs=G.reduce((a,[,l])=>a+l.reduce((s,p)=>s+(rec(p.id).qty||0),0),0);
+  const OR=[242,98,0];
+  doc.setFont("helvetica","bold"); doc.setFontSize(24); doc.setTextColor(17,17,17); doc.text("Fit",14,20); const fw=doc.getTextWidth("Fit"); doc.setTextColor(...OR); doc.text("X",14+fw,20);
+  doc.setFont("helvetica","normal"); doc.setFontSize(7.5); doc.setTextColor(100,100,100); doc.text("SPORTS EQUIPMENT SERVICES",14,25);
+  doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.setTextColor(17,17,17); doc.text(pdfTxt(repTitleText()),W-14,17,{align:"right"});
+  doc.setFont("helvetica","normal"); doc.setFontSize(8.5); doc.setTextColor(100,100,100); doc.text(pdfTxt(repStamp()),W-14,22.5,{align:"right"});
+  doc.text(`Parts ${nParts}   Pieces ${pcs}   Categories ${G.length}`,W-14,27,{align:"right"});
+  doc.setDrawColor(...OR); doc.setLineWidth(.9); doc.line(14,29.5,W-14,29.5);
+  let y=35;
+  if(!G.length){ doc.setFontSize(10); doc.text("No parts match these choices.",14,y) }
+  G.forEach(([c,l])=>{
+    if(y>H-30){ doc.addPage(); y=18 }
+    doc.setFont("helvetica","bold"); doc.setFontSize(10.5); doc.setTextColor(194,78,0); doc.text(pdfTxt(`${c.toUpperCase()} (${l.length})`),14,y);
+    let sum=0; const body=l.map((p,i)=>{const r=rec(p.id); sum+=r.qty||0; return [i+1,pdfTxt(p.name),pdfTxt([p.spec,p.pkg].filter(Boolean).join(" · ")),pdfTxt(r.bin||""),r.qty||0,r.min??DEFAULT_MIN,statusTxt(p.id)]});
+    body.push([{content:pdfTxt(`Total ${c}`),colSpan:4,styles:{fontStyle:"bold",halign:"right"}},{content:sum,styles:{fontStyle:"bold"}},"",""]);
+    doc.autoTable({startY:y+2,head:[["#","Part","Description","Bin","Qty","Low at","Status"]],body,theme:"grid",margin:{left:14,right:14},
+      styles:{fontSize:8,cellPadding:1.6,lineColor:[225,225,225],lineWidth:.15,textColor:[20,20,20]},headStyles:{fillColor:OR,textColor:255,fontStyle:"bold"},
+      columnStyles:{0:{cellWidth:9,halign:"right"},1:{cellWidth:42,fontStyle:"bold"},2:{cellWidth:"auto"},3:{cellWidth:22},4:{cellWidth:13,halign:"right"},5:{cellWidth:14,halign:"right"},6:{cellWidth:14}},
+      didParseCell:d=>{ if(d.section==="body"&&d.column.index===6){ if(d.cell.raw==="Out") d.cell.styles.textColor=[192,48,42]; else if(d.cell.raw==="Low") d.cell.styles.textColor=[154,91,0] } if(d.section==="body"&&d.row.index===body.length-1) d.cell.styles.fillColor=[255,244,236] }});
+    y=doc.lastAutoTable.finalY+8;
+  });
+  const n=doc.getNumberOfPages();
+  for(let i=1;i<=n;i++){ doc.setPage(i); doc.setFontSize(7.5); doc.setTextColor(130,130,130); doc.text("FitX Sports Equipment Services · www.fitx.qa · 50107300",14,H-8); doc.text(`Page ${i} of ${n}`,W-14,H-8,{align:"right"}) }
+  return doc;
+}
+function repFileName(){ const d=new Date(),z=x=>String(x).padStart(2,"0"); const c=rep.cats.size===1?"-"+[...rep.cats][0].toLowerCase().replace(/[^a-z0-9]+/g,"-"):""; return `fitx-stock-${rep.which}${c}-${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}.pdf` }
+async function pdfToDevice(blob,name,dir){
+  const P=window.Capacitor.Plugins;
+  const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(",")[1]);r.onerror=rej;r.readAsDataURL(blob)});
+  await P.Filesystem.writeFile({path:name,data:b64,directory:dir,recursive:true});
+  return (await P.Filesystem.getUri({path:name,directory:dir})).uri;
+}
+async function repOpen(mode){
+  const doc=await buildPdf(), name=repFileName(), blob=doc.output("blob");
+  if(isApp){
+    const P=window.Capacitor.Plugins;
+    if(mode==="share"){ const uri=await pdfToDevice(blob,name,"CACHE"); await P.Share.share({title:name,files:[uri],dialogTitle:"Share stock report"}); return }
+    if(mode==="save"){ let uri; try{ uri=await pdfToDevice(blob,"FitX/"+name,"DOCUMENTS"); toast("Saved in Documents/FitX: "+name) }catch(e){ uri=await pdfToDevice(blob,name,"CACHE") }
+      try{ await P.FileOpener.open({filePath:uri,contentType:"application/pdf"}) }catch(e){} return }
+    // preview / print: open in the phone's PDF viewer (use its Print option)
+    const uri=await pdfToDevice(blob,name,"CACHE");
+    try{ await P.FileOpener.open({filePath:uri,contentType:"application/pdf"}); if(mode==="print") toast("Use Print in the PDF viewer menu") }
+    catch(e){ await P.Share.share({title:name,files:[uri],dialogTitle:"Open stock report"}) }
+    return;
+  }
+  if(mode==="share"){
+    const file=new File([blob],name,{type:"application/pdf"});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){ try{ await navigator.share({files:[file],title:"FitX stock report"}); return }catch(e){ if(e.name==="AbortError") return } }
+    toast("Sharing isn't available in this browser. The PDF was saved instead."); mode="save";
+  }
+  if(mode==="save"){ const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000); toast("PDF saved: "+name); return }
+  const url=URL.createObjectURL(blob), w=window.open(url,"_blank"); if(!w){ const a=document.createElement("a"); a.href=url; a.target="_blank"; a.click() }
+}
+$("reportOpen").onclick=()=>{ rep.cats=new Set(state.cat!=="All"?[state.cat]:[]); renderRepCats(); renderReport(); $("repBg").hidden=false };
+$("repClose").onclick=()=>$("repBg").hidden=true;
+$("repBg").addEventListener("click",e=>{
+  if(e.target.id==="repBg"){$("repBg").hidden=true;return}
+  const c=e.target.closest("[data-rcat]");
+  if(c){ const v=c.dataset.rcat; if(!v) rep.cats.clear(); else rep.cats.has(v)?rep.cats.delete(v):rep.cats.add(v); renderRepCats(); renderReport(); return }
+  const w=e.target.closest("[data-which]");
+  if(w){ rep.which=w.dataset.which; document.querySelectorAll("[data-which]").forEach(b=>b.setAttribute("aria-pressed",String(b===w))); renderRepCats(); renderReport() }
+});
+$("repPrint").onclick=()=>busy($("repPrint"),"Preparing…",async()=>{ if(isApp) await repOpen("print"); else window.print() });
+$("repPdf").onclick=()=>busy($("repPdf"),"Making PDF…",()=>repOpen("preview"));
+$("repSave").onclick=()=>busy($("repSave"),"Saving…",()=>repOpen("save"));
+$("repShare").onclick=()=>busy($("repShare"),"Preparing…",()=>repOpen("share"));
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") $("repBg").hidden=true });
 
 // ---------- Excel import + sample file ----------
 const SAMPLE_FILE="fitx-parts-import-sample.xlsx";
