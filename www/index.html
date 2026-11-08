@@ -163,8 +163,8 @@ main .wrap{padding-bottom:84px}
 .rep-paper{background:#fff;color:#111;border:1px solid var(--line);border-radius:8px;padding:16px;max-height:52vh;overflow:auto;font-size:12px}
 .rep-paper h4{margin:12px 0 4px;font:700 13px var(--display);text-transform:uppercase;letter-spacing:.04em;color:#c24e00;border-bottom:1.5px solid #f26200;padding-bottom:3px}
 .rep-paper table{width:100%;border-collapse:collapse}
-.rep-paper th{background:#f26200;color:#fff;text-align:left;padding:4px 5px;font-size:10.5px}
-.rep-paper td{padding:3px 5px;border-bottom:1px solid #e6e6e6;font-size:11px}
+.rep-paper th,#printArea th{background:#f26200;color:#fff;text-align:left;padding:4px 5px;font-size:10.5px;border:.5px solid #b8b8b8}
+.rep-paper td,#printArea td{padding:3px 5px;border:.5px solid #b8b8b8;font-size:11px}
 .rep-paper td.r,.rep-paper th.r{text-align:right}
 .rep-paper .sub td{font-weight:700;background:#fff4ec}
 .rep-head{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;border-bottom:3px solid #f26200;padding-bottom:8px}
@@ -174,11 +174,19 @@ main .wrap{padding-bottom:84px}
 .rep-sum b{font-family:var(--mono)}
 .rep-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 @media (max-width:420px){.rep-actions{grid-template-columns:1fr 1fr}}
+#printArea{display:none}
 @media print{
-  body *{visibility:hidden!important}
-  #repPaper,#repPaper *{visibility:visible!important}
-  #repPaper{position:absolute;left:0;top:0;width:100%;max-height:none;overflow:visible;border:0;padding:0}
-  #repPaper tr{break-inside:avoid}
+  body.printing>*:not(#printArea){display:none!important}
+  body.printing #printArea{display:block!important;color:#111;background:#fff;font:11px/1.35 var(--body)}
+  :root{padding:0!important}
+  body.printing{background:#fff!important;padding:0!important}
+  #printArea table{width:100%;border-collapse:collapse}
+  #printArea thead{display:table-header-group}
+  #printArea tr{break-inside:avoid;page-break-inside:avoid}
+  #printArea h4{margin:10px 0 4px;font:700 12px var(--display);text-transform:uppercase;letter-spacing:.04em;color:#c24e00;border-bottom:1.5px solid #f26200;padding-bottom:3px;break-after:avoid}
+  #printArea td.r,#printArea th.r{text-align:right}
+  #printArea .sub td{font-weight:700;background:#fff4ec}
+  #printArea *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   @page{size:A4;margin:12mm}
 }
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:.88rem;z-index:30;max-width:calc(100% - 32px)}
@@ -1266,7 +1274,7 @@ async function buildPdf(){
     let sum=0; const body=l.map((p,i)=>{const r=rec(p.id); sum+=r.qty||0; return [i+1,pdfTxt(p.name),pdfTxt([p.spec,p.pkg].filter(Boolean).join(" · ")),pdfTxt(r.bin||""),r.qty||0,r.min??DEFAULT_MIN,statusTxt(p.id)]});
     body.push([{content:pdfTxt(`Total ${c}`),colSpan:4,styles:{fontStyle:"bold",halign:"right"}},{content:sum,styles:{fontStyle:"bold"}},"",""]);
     doc.autoTable({startY:y+2,head:[["#","Part","Description","Bin","Qty","Low at","Status"]],body,theme:"grid",margin:{left:14,right:14},
-      styles:{fontSize:8,cellPadding:1.6,lineColor:[225,225,225],lineWidth:.15,textColor:[20,20,20]},headStyles:{fillColor:OR,textColor:255,fontStyle:"bold"},
+      styles:{fontSize:8,cellPadding:1.6,lineColor:[150,150,150],lineWidth:.1,textColor:[20,20,20]},headStyles:{fillColor:OR,textColor:255,fontStyle:"bold",lineColor:[150,150,150],lineWidth:.1},
       columnStyles:{0:{cellWidth:9,halign:"right"},1:{cellWidth:42,fontStyle:"bold"},2:{cellWidth:"auto"},3:{cellWidth:22},4:{cellWidth:13,halign:"right"},5:{cellWidth:14,halign:"right"},6:{cellWidth:14}},
       didParseCell:d=>{ if(d.section==="body"&&d.column.index===6){ if(d.cell.raw==="Out") d.cell.styles.textColor=[192,48,42]; else if(d.cell.raw==="Low") d.cell.styles.textColor=[154,91,0] } if(d.section==="body"&&d.row.index===body.length-1) d.cell.styles.fillColor=[255,244,236] }});
     y=doc.lastAutoTable.finalY+8;
@@ -1312,7 +1320,15 @@ $("repBg").addEventListener("click",e=>{
   const w=e.target.closest("[data-which]");
   if(w){ rep.which=w.dataset.which; document.querySelectorAll("[data-which]").forEach(b=>b.setAttribute("aria-pressed",String(b===w))); renderRepCats(); renderReport() }
 });
-$("repPrint").onclick=()=>busy($("repPrint"),"Preparing…",async()=>{ if(isApp) await repOpen("print"); else window.print() });
+function printReport(){
+  let a=$("printArea"); if(!a){ a=document.createElement("div"); a.id="printArea"; document.body.appendChild(a) }
+  a.innerHTML=$("repPaper").innerHTML;
+  document.body.classList.add("printing");
+  const done=()=>{ document.body.classList.remove("printing"); a.innerHTML=""; window.removeEventListener("afterprint",done) };
+  window.addEventListener("afterprint",done);
+  setTimeout(()=>{ window.print(); setTimeout(()=>{ if(document.body.classList.contains("printing")) done() },1500) },50);
+}
+$("repPrint").onclick=()=>busy($("repPrint"),"Preparing…",async()=>{ if(isApp) await repOpen("print"); else printReport() });
 $("repPdf").onclick=()=>busy($("repPdf"),"Making PDF…",()=>repOpen("preview"));
 $("repSave").onclick=()=>busy($("repSave"),"Saving…",()=>repOpen("save"));
 $("repShare").onclick=()=>busy($("repShare"),"Preparing…",()=>repOpen("share"));
