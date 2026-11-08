@@ -273,6 +273,11 @@ LED 5mm red, 2
       <label class="field" style="grid-column:1/-1">Part name<input type="text" id="fName" placeholder="e.g. LM2903"><span class="fhint" id="fBeltHint" hidden></span></label>
       <label class="field">Category<select id="fCat"></select></label>
       <label class="field">Package<input type="text" id="fPkg" placeholder="DIP-8, SOT-23…"></label>
+      <div id="fDeckBox" class="grid2" style="grid-column:1/-1;grid-template-columns:repeat(3,1fr)" hidden>
+        <label class="field">Width mm<input type="number" id="fDW" min="0" inputmode="numeric" placeholder="600"></label>
+        <label class="field">Length mm<input type="number" id="fDL" min="0" inputmode="numeric" placeholder="1343"></label>
+        <label class="field">Thickness mm<input type="number" id="fDT" min="0" inputmode="numeric" placeholder="18"></label>
+      </div>
       <label class="field" id="fNewCatBox" style="grid-column:1/-1" hidden>New category name<input type="text" id="fNewCat" placeholder="e.g. Treadmill boards"></label>
       <label class="field" style="grid-column:1/-1">Description<input type="text" id="fSpec" placeholder="Dual comparator"></label>
     </div>
@@ -389,7 +394,7 @@ LED 5mm red, 2
 
 <script>
 // ---------- Catalog ----------
-const CATS=["Drive belt","Treadmill","Bike & elliptical","Console","Cardio wiring","Bearing","Resistor","Capacitor","Diode","Rectifier","LED","Transistor","MOSFET","IGBT","Thyristor","Regulator","Power IC","IC","Gate driver","Optocoupler","Microcontroller","Memory","Interface","Sensor","Module","Display","Relay","Passive","Inductor","Transformer","Fuse","Switch","Connector","Electromech","Hardware","Power"];
+const CATS=["Drive belt","Deck","Treadmill","Bike & elliptical","Console","Cardio wiring","Bearing","Resistor","Capacitor","Diode","Rectifier","LED","Transistor","MOSFET","IGBT","Thyristor","Regulator","Power IC","IC","Gate driver","Optocoupler","Microcontroller","Memory","Interface","Sensor","Display","Relay","Passive","Inductor","Transformer","Fuse","Switch","Connector","Electromech","Hardware","Power"];
 const C=[];
 const SEEN=new Set();
 function add(cat,name,spec,pkg){let id=mkid(cat+"-"+name);if(SEEN.has(id))id=mkid(cat+"-"+name+"-"+spec);SEEN.add(id);C.push({id,cat,name,spec,pkg})}
@@ -476,6 +481,11 @@ FM_PJ.forEach(([j,mm,max])=>{const e=DB_ALL.get(j); if(e) e.max=max; else DB_ALL
   add("Drive belt",`${j}J (PJ${mm})`,(tm?"Treadmill drive belt":"PJ drive belt")+(ribs.length?" · "+ribs.join("/")+" ribs":"")+(max?` · made up to ${max} ribs`:""),"Poly-V");
   const p=C[C.length-1]; p.alias=[`${j}J`,`${j} J`,`PJ${mm}`,`${mm}PJ`,`PJ ${mm}`,`${mm} PJ`,`${j}J PJ${mm}`];
 });
+
+// ---- Treadmill decks: [width, length, thickness] in mm (0 = thickness not recorded) ----
+const DECKS=[[425,1010,15],[486,1080,20],[502,1202,15],[548,1440,27],[570,1200,18],[575,1135,0],[595,1320,18],[600,1150,22],[600,1205,0],[600,1343,0],[600,1490,25],[603,1114,18],[605,1390,25],[610,1290,18],[610,1370,0],[610,1400,0],[612,1300,28],[675,1223,20],[675,1390,27],[702,1126,20],[708,1260,20],[713,1365,27],[740,1360,25],[762,1358,28]];
+function deckName(w,l,t){ return `Deck ${w} x ${l}${t?` x ${t}`:""} mm` }
+DECKS.forEach(([w,l,t])=>{ add("Deck",deckName(w,l,t),`Treadmill deck · W ${w} x L ${l} mm · `+(t?`${t} mm thick`:"thickness not recorded"),"Deck board"); C[C.length-1].alias=[`${w}x${l}`,`${w} x ${l}`,`${l}x${w}`]; });
 // ---- Gym cardio equipment parts ----
 T("Treadmill",[
  ["DC drive motor 1.5HP 180V","Permanent-magnet DC, home","Motor"],["DC drive motor 2.0HP 180V","Permanent-magnet DC","Motor"],["DC drive motor 2.5HP 180V","Permanent-magnet DC","Motor"],["DC drive motor 3.0HP 220V","Permanent-magnet DC","Motor"],["DC drive motor 4.0HP 220V","Commercial PMDC","Motor"],["AC drive motor 3HP 220V","Commercial AC induction","Motor"],["AC drive motor 4HP 380V","Commercial AC induction, 3-phase","Motor"],
@@ -643,6 +653,15 @@ C.forEach(p=>{
   else if(p.cat==="Passive"&&/^Fuse|^PTC fuse|^Varistor/.test(p.name)) p.cat=/^Varistor/.test(p.name)?"Passive":"Fuse";
   else if(p.cat==="Passive"&&/^(Inductor|Ferrite)/.test(p.name)) p.cat="Inductor";
   else if((p.cat==="Treadmill"||p.cat==="Bike & elliptical")&&/^(Drive belt poly-V|Poly-V belt)/.test(p.name)) p.cat="Drive belt";
+  else if(p.cat==="Treadmill"&&/^Deck (board|elastomer)/.test(p.name)) p.cat="Deck";
+  else if(p.cat==="Module"){
+    if(/^(Arduino|ESP32 DevKit|NodeMCU|Raspberry Pi Pico|STM32 Blue Pill)/.test(p.name)) p.cat="Microcontroller";
+    else if(/^Relay module/.test(p.name)) p.cat="Relay";
+    else if(/(buck|boost|charger) module/.test(p.name)) p.cat="Power";
+    else if(/(L298N|A4988|DRV8825|PCA9685)/.test(p.name)) p.cat="Electromech";
+    else if(/MAX7219/.test(p.name)) p.cat="Display";
+    else p.cat="Interface";
+  }
 });
 
 // ---------- State ----------
@@ -659,7 +678,8 @@ const DEFAULT_MIN=5;
 let state={cat:"All",st:"all",q:"",limit:80};
 
 const $=id=>document.getElementById(id);
-function all(){return C.filter(p=>!hiddenIds[p.id]).map(p=>edits[p.id]?{...p,...edits[p.id],edited:true}:p).concat(Object.entries(custom).map(([id,c])=>({id,custom:true,...c})))}
+function fixCat(c){return c==="Module"?"Interface":c}
+function all(){return C.filter(p=>!hiddenIds[p.id]).map(p=>edits[p.id]?{...p,...edits[p.id],edited:true}:p).concat(Object.entries(custom).map(([id,c])=>({id,custom:true,...c,cat:fixCat(c.cat)})))}
 function deletedParts(){return C.filter(p=>hiddenIds[p.id]).map(p=>edits[p.id]?{...p,...edits[p.id]}:p)}
 function rec(id){return stock[id]||{qty:0,min:DEFAULT_MIN,bin:""}}
 function status(id){const r=rec(id);const min=r.min??DEFAULT_MIN;return r.qty<=0?"out":r.qty<=min?"low":"in"}
@@ -677,6 +697,7 @@ function bandsFor(name){
 
 // ---------- Category icons (drawn, 24x24, stroke) ----------
 const IC={
+ "Deck":'<path d="M2 9l4-3h16l-4 3z"/><path d="M2 9h16v4H2zM18 13l4-3V6"/><path d="M6 11h2M11 11h2"/>',
  "Drive belt":'<circle cx="6" cy="12" r="3.5"/><circle cx="18" cy="12" r="2.5"/><path d="M6 8.5l12 1M6 15.5l12-1"/><circle cx="6" cy="12" r="1"/><circle cx="18" cy="12" r=".8"/>',
  "Treadmill":'<path d="M3 17h15a3 3 0 0 0 0-6H6a3 3 0 0 0 0 6"/><circle cx="6" cy="14" r="1"/><circle cx="18" cy="14" r="1"/><path d="M18 11l2-7h2M3 21h18"/>',
  "Bike & elliptical":'<circle cx="6" cy="16" r="3.5"/><path d="M6 16l4-7h6M10 9l3 7h-7M16 9l1.5-4H20M13 16l-1 4M17.5 5H15"/><path d="M8 5h4"/><circle cx="18" cy="16" r="2"/>',
@@ -1010,6 +1031,11 @@ $("fName").addEventListener("blur",()=>{ const b=beltParse($("fName").value); if
   const j=Math.round(b.from==="J"?b.j:b.mm/2.54), mm=Math.round(b.from==="J"?b.j*2.54:b.mm);
   $("fName").value=`${j}J (PJ${mm})`; if($("fCat").value!=="Drive belt") fillCatSelect("Drive belt");
   if(!$("fPkg").value) $("fPkg").value="Poly-V"; if(!$("fSpec").value) $("fSpec").value="PJ drive belt"+(b.ribs?` · ${b.ribs} ribs`:""); formBeltHint() });
+function deckFromName(n){ const m=/(\d{3,4})\s*[x×*]\s*(\d{3,4})(?:\s*[x×*]\s*(\d{1,2}))?/i.exec(n||""); return m?{w:+m[1],l:+m[2],t:m[3]?+m[3]:""}:null }
+function syncDeckBox(){ const on=$("fCat").value==="Deck"; $("fDeckBox").hidden=!on; if(on&&!$("fDW").value){ const d=deckFromName($("fName").value); if(d){$("fDW").value=d.w;$("fDL").value=d.l;$("fDT").value=d.t} } }
+["fDW","fDL","fDT"].forEach(id=>$(id).addEventListener("input",()=>{ const w=+$("fDW").value,l=+$("fDL").value,t=+$("fDT").value;
+  if(w&&l){ $("fName").value=deckName(Math.min(w,l),Math.max(w,l),t||0); $("fSpec").value=`Treadmill deck · W ${Math.min(w,l)} x L ${Math.max(w,l)} mm · `+(t?`${t} mm thick`:"thickness not recorded"); if(!$("fPkg").value) $("fPkg").value="Deck board" } }));
+$("fCat").addEventListener("change",syncDeckBox);
 $("fCat").addEventListener("change",()=>{const n=$("fCat").value==="__new";$("fNewCatBox").hidden=!n;if(n)$("fNewCat").focus()});
 function openSheet(id){
   if(readOnly){toast("You can view this stock list but not change it.");return}
@@ -1021,6 +1047,7 @@ function openSheet(id){
   $("fQty").value=r.qty; $("fMin").value=r.min??DEFAULT_MIN; $("fBin").value=r.bin||"";
   $("shDel").hidden=isNew; $("shDel").dataset.confirm=""; $("shDel").textContent="Delete part";
   $("shReset").hidden=!(p&&p.edited);
+  $("fDW").value=$("fDL").value=$("fDT").value=""; syncDeckBox();
   $("sheetBg").hidden=false; (isNew?$("fName"):$("fQty")).focus();
 }
 function closeSheet(){$("sheetBg").hidden=true;editing=null}
