@@ -32,7 +32,7 @@ jobs:
       - name: Create Android project
         run: |
           npx cap add android
-          npx @capacitor/assets generate --android --iconBackgroundColor '#000000' --splashBackgroundColor '#ffffff'
+          cp -r android-res/* android/app/src/main/res/
           npx cap sync android
 
       - name: Set version
