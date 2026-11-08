@@ -41,7 +41,10 @@ jobs:
           sed -i "s/versionName \"1.0\"/versionName \"1.0.${{ github.run_number }}\"/" android/app/build.gradle
 
       - name: Build release APK
-        run: cd android && chmod +x gradlew && ./gradlew assembleRelease
+        run: |
+          cd android && chmod +x gradlew
+          sed -i "s/networkTimeout=10000/networkTimeout=120000/" gradle/wrapper/gradle-wrapper.properties || true
+          ./gradlew assembleRelease || (sleep 30 && ./gradlew assembleRelease) || (sleep 60 && ./gradlew assembleRelease)
 
       - name: Sign APK
         env:
