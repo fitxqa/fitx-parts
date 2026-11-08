@@ -27,7 +27,7 @@ jobs:
         run: sed -i "s/__BUILD__/${{ github.run_number }}/g" www/index.html www/sw.js
 
       - name: Install Capacitor
-        run: npm install
+        run: npm install || (sleep 20 && npm install) || (sleep 40 && npm install)
 
       - name: Create Android project
         run: |
